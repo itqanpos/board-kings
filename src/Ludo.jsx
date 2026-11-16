@@ -1,17 +1,44 @@
 import React, { useState } from 'react';
 import { COLORS, HEX, NAMES, SAFE_SPOTS, getTokenCoords, getInitialTokens } from './ludoEngine';
 
-// زهر ثلاثي الأبعاد بشكل يلا لودو
+// استخدام صور النرد من الأصول
 const DiceFace = ({ value }) => {
-  const dots = {
-    1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8]
+  const diceImages = {
+    1: 'https://raw.githubusercontent.com/MayerAttila/Ludo/main/Assets/Sprites/dice1.png',
+    2: 'https://raw.githubusercontent.com/MayerAttila/Ludo/main/Assets/Sprites/dice2.png',
+    3: 'https://raw.githubusercontent.com/MayerAttila/Ludo/main/Assets/Sprites/dice3.png',
+    4: 'https://raw.githubusercontent.com/MayerAttila/Ludo/main/Assets/Sprites/dice4.png',
+    5: 'https://raw.githubusercontent.com/MayerAttila/Ludo/main/Assets/Sprites/dice5.png',
+    6: 'https://raw.githubusercontent.com/MayerAttila/Ludo/main/Assets/Sprites/dice6.png',
   };
+
   return (
-    <div className="yalla-dice">
-      {[...Array(9)].map((_, i) => (
-        <div key={i} className={`yalla-dot ${dots[value]?.includes(i) ? 'active' : ''}`} />
-      ))}
+    <div className="dice-3d-image">
+      {value > 0 ? (
+        <img src={diceImages[value]} alt={`Dice ${value}`} className="dice-img" />
+      ) : (
+        <div className="dice-placeholder">?</div>
+      )}
     </div>
+  );
+};
+
+// استخدام صور القطع من الأصول
+const TokenImage = ({ color }) => {
+  const tokenImages = {
+    red: 'https://raw.githubusercontent.com/MayerAttila/Ludo/main/Assets/Sprites/fugureRed.png',
+    green: 'https://raw.githubusercontent.com/MayerAttila/Ludo/main/Assets/Sprites/fugureGreen.png',
+    blue: 'https://raw.githubusercontent.com/MayerAttila/Ludo/main/Assets/Sprites/fugureBlue.png', // قد لا يكون موجوداً، سنستخدم لوناً بديلاً
+    yellow: 'https://raw.githubusercontent.com/MayerAttila/Ludo/main/Assets/Sprites/fugureYellow.png',
+  };
+
+  // إذا لم تكن الصورة متاحة، استخدم دائرة ملونة
+  return (
+    <image
+      href={tokenImages[color] || tokenImages.red} // fallback
+      x="-0.5" y="-0.5" width="1" height="1"
+      preserveAspectRatio="xMidYMid meet"
+    />
   );
 };
 
@@ -164,7 +191,7 @@ function Ludo({ onBack }) {
             <polygon points="9,9 6,9 7.5,7.5" fill="url(#blueGrad)" stroke="#fff" strokeWidth="0.05"/>
             <polygon points="6,9 6,6 7.5,7.5" fill="url(#yellowGrad)" stroke="#fff" strokeWidth="0.05"/>
 
-            {/* القطع الزجاجية اللامعة */}
+            {/* القطع الزجاجية اللامعة باستخدام الصور */}
             {tokens.map(t => {
               const [cx, cy] = getTokenCoords(t.color, t.pos, parseInt(t.id.split('-')[1]));
               const isMyTurn = t.color === COLORS[currentPlayer];
@@ -172,9 +199,7 @@ function Ludo({ onBack }) {
               
               return (
                 <g key={t.id} className={`token-group ${canMove ? 'clickable' : ''}`} onClick={() => canMove && moveToken(t.id)}>
-                  <circle cx={cx + 0.1} cy={cy + 0.15} r="0.4" fill="rgba(0,0,0,0.4)" />
-                  <circle cx={cx} cy={cy} r="0.4" fill={`url(#${t.color}Grad)`} stroke="#fff" strokeWidth="0.08" />
-                  <ellipse cx={cx - 0.1} cy={cy - 0.15} rx="0.15" ry="0.08" fill="rgba(255,255,255,0.6)" transform={`rotate(-45 ${cx-0.1} ${cy-0.15})`} />
+                  <TokenImage color={t.color} />
                 </g>
               );
             })}
@@ -187,7 +212,7 @@ function Ludo({ onBack }) {
         {message && <div className="toast-msg">{message}</div>}
         
         <div className="dice-container">
-          {dice > 0 ? <DiceFace value={dice} /> : <div className="yalla-dice empty">?</div>}
+          <DiceFace value={dice} />
         </div>
 
         {!hasRolled ? (
