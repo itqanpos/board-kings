@@ -20,6 +20,10 @@ jobs:
         with:
           channel: 'stable'
 
+      # السطر الجديد ده هو اللي هيصلح المشكلة
+      - name: Configure for Web
+        run: flutter create . --platforms web
+
       - name: Build Web
         run: flutter build web --release
 
