@@ -133,3 +133,31 @@ button:active {
   border: 1px solid #c9c9c9;
   width: auto;
 }
+/* تنسيقات النرد */
+.ludo-controls {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+  width: 100%;
+}
+
+.dice-display {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #1a1f3a;
+  background-color: #fff;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+
+.roll-btn {
+  width: 80%;
+  max-width: 250px;
+}
