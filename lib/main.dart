@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'ludo_screen.dart'; // استدعاء الشاشة الجديدة
 
 void main() {
   runApp(const BoardKingsApp());
@@ -15,7 +16,6 @@ class BoardKingsApp extends StatelessWidget {
       theme: ThemeData(
         brightness: Brightness.dark,
         primaryColor: const Color(0xFFD4AF37),
-        fontFamily: 'Cairo', // ممكن نضيف الخط بعدين
       ),
       home: const MainMenu(),
     );
@@ -50,7 +50,12 @@ class MainMenu extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
                 textStyle: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
-              onPressed: () {},
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LudoScreen()),
+                );
+              },
               child: const Text('Ludo - لودو'),
             ),
             const SizedBox(height: 20),
@@ -61,7 +66,9 @@ class MainMenu extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
                 textStyle: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
-              onPressed: () {},
+              onPressed: () {
+                // لسه هنجهزها
+              },
               child: const Text('Domino - دومينو'),
             ),
           ],
