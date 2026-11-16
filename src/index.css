@@ -1,17 +1,19 @@
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@600;800;900&display=swap');
 
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
 }
 
 body {
-  /* خلفية متدرجة فخمة */
-  background: radial-gradient(circle at top, #1e293b 0%, #0f172a 100%);
-  color: #f8fafc;
-  font-family: 'Cairo', -apple-system, sans-serif;
-  min-height: 100dvh; 
+  background: linear-gradient(180deg, #2b3a4a 0%, #111827 100%);
+  color: #fff;
+  font-family: 'Cairo', sans-serif;
+  min-height: 100dvh;
 }
 
 #root {
@@ -19,285 +21,211 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 15px;
+  padding: 10px;
 }
 
 .app-container {
   width: 100%;
-  max-width: 450px;
+  max-width: 480px;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
-/* القائمة الرئيسية */
-h1 { 
-  font-size: 3rem; 
-  font-weight: 900;
-  letter-spacing: 2px; 
-  text-align: center; 
-  color: #d4af37; 
-  text-shadow: 0 4px 15px rgba(212, 175, 55, 0.4);
-  background: linear-gradient(to bottom, #fdfbfb 0%, #d4af37 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-.menu-screen p { color: #94a3b8; margin-top: 0.5rem; margin-bottom: 3rem; text-align: center; font-size: 1.2rem; }
-.menu-buttons { width: 100%; display: flex; flex-direction: column; gap: 20px; }
+/* تصميم القائمة الرئيسية */
+.menu-screen h1 { font-size: 3rem; color: #FFD700; text-shadow: 0 5px 15px rgba(255, 215, 0, 0.4); text-align: center; }
+.menu-screen p { color: #9CA3AF; margin-bottom: 2rem; text-align: center; }
+.menu-buttons { width: 100%; display: flex; flex-direction: column; gap: 15px; }
 
 button {
-  background: linear-gradient(135deg, #d4af37 0%, #b8860b 100%);
-  color: #0f172a;
+  background: linear-gradient(180deg, #FFD700 0%, #D4AF37 100%);
+  color: #111827;
   border: none;
-  padding: 18px;
+  padding: 15px;
   font-family: 'Cairo', sans-serif;
-  font-size: 1.3rem;
+  font-size: 1.2rem;
   font-weight: 800;
-  border-radius: 16px;
+  border-radius: 12px;
   cursor: pointer;
   width: 100%;
-  box-shadow: 0 10px 20px rgba(0,0,0,0.4), inset 0 2px 0 rgba(255,255,255,0.4);
-  transition: transform 0.1s, box-shadow 0.1s;
-  position: relative;
-  overflow: hidden;
+  box-shadow: 0 6px 0 #A68A00, 0 10px 15px rgba(0,0,0,0.4);
+  transition: transform 0.1s;
+}
+button:active { transform: translateY(4px); box-shadow: 0 2px 0 #A68A00; }
+
+/* --- شاشة Ludo (يلا لودو) --- */
+.yalla-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-button::after {
-  content: '';
-  position: absolute;
-  top: 0; left: -100%;
-  width: 50%; height: 100%;
-  background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0) 100%);
-  transform: skewX(-25deg);
-  animation: shine 3s infinite;
-}
-
-@keyframes shine {
-  100% { left: 200%; }
-}
-
-button:active {
-  transform: translateY(4px);
-  box-shadow: 0 4px 10px rgba(0,0,0,0.4), inset 0 2px 0 rgba(255,255,255,0.4);
-}
-
-/* --- تنسيقات Ludo --- */
-.ludo-container { width: 100%; display: flex; flex-direction: column; align-items: center; }
-
-.ludo-header {
+/* شريط اللاعبين */
+.players-bar {
   width: 100%;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  gap: 5px;
+  margin-bottom: 15px;
+  padding: 0 5px;
 }
 
-.turn-indicator { 
-  font-size: 1.1rem; 
-  font-weight: bold; 
-  color: #f8fafc; 
-  background: rgba(30, 41, 59, 0.8); 
-  backdrop-filter: blur(10px);
-  padding: 10px 20px; 
-  border-radius: 30px; 
-  box-shadow: inset 0 2px 5px rgba(0,0,0,0.5), 0 4px 10px rgba(0,0,0,0.3);
-  border: 1px solid rgba(255,255,255,0.1);
+.player-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid transparent;
+  transition: all 0.3s;
 }
 
-.back-btn { 
-  background: rgba(51, 65, 85, 0.8); 
-  backdrop-filter: blur(10px);
-  color: #f8fafc; 
-  padding: 10px 20px; 
-  font-size: 0.9rem; 
-  border-radius: 12px; 
-  width: auto; 
-  box-shadow: 0 4px 10px rgba(0,0,0,0.3); 
-  border: 1px solid rgba(255,255,255,0.1);
+.player-badge.active {
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
 }
 
-.ludo-board-wrapper { 
-  width: 100%; 
-  background: #f8fafc; 
-  border-radius: 20px; 
-  overflow: hidden; 
+.player-badge .avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  margin-bottom: 2px;
+  box-shadow: inset 0 -2px 5px rgba(0,0,0,0.4);
+}
+
+.player-badge .name {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.exit-btn {
+  background: #EF4444;
+  color: white;
+  width: 35px !important;
+  height: 35px;
+  border-radius: 50%;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1rem;
+  box-shadow: 0 4px 0 #991B1B;
+}
+
+/* اللوحة الخشبية */
+.yalla-board-wrapper {
+  width: 100%;
+  padding: 8px;
+  background: linear-gradient(135deg, #5D4037 0%, #3E2723 100%);
+  border-radius: 16px;
   box-shadow: 
-    0 25px 50px -12px rgba(0, 0, 0, 0.7),
-    0 0 0 4px #d4af37,
-    0 0 30px rgba(212, 175, 55, 0.2);
-  border: 4px solid #1e293b;
-  position: relative;
+    0 20px 40px rgba(0,0,0,0.6),
+    inset 0 2px 5px rgba(255,255,255,0.2),
+    inset 0 -4px 10px rgba(0,0,0,0.5);
+  border: 2px solid #8D6E63;
 }
-.ludo-svg { width: 100%; height: auto; display: block; }
 
-.token-group { transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+.yalla-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 8px;
+  background: #fff;
+}
+
+/* تأثيرات القطع */
+.token-group { transition: all 0.2s ease; }
 .token-group.clickable {
   cursor: pointer;
-  animation: pulse-glow 1.5s infinite;
+  animation: pop 0.8s infinite alternate;
 }
 
-@keyframes pulse-glow {
-  0% { filter: drop-shadow(0 0 2px #fff); transform: scale(1); }
-  50% { filter: drop-shadow(0 0 12px #fff); transform: scale(1.1); }
-  100% { filter: drop-shadow(0 0 2px #fff); transform: scale(1); }
+@keyframes pop {
+  from { transform: scale(1); filter: drop-shadow(0 0 0px #fff); }
+  to { transform: scale(1.15); filter: drop-shadow(0 0 8px #fff); }
 }
 
-.ludo-controls { margin-top: 30px; display: flex; flex-direction: column; align-items: center; gap: 20px; width: 100%; }
-
-.dice-wrapper {
-  height: 70px;
+/* لوحة التحكم */
+.yalla-controls {
+  margin-top: 20px;
+  width: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  gap: 15px;
+  position: relative;
 }
 
-.dice-3d {
-  width: 65px;
-  height: 65px;
-  background: linear-gradient(145deg, #ffffff, #e2e8f0);
-  border-radius: 15px;
+.toast-msg {
+  position: absolute;
+  top: -40px;
+  background: rgba(0,0,0,0.8);
+  color: #FFD700;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: bold;
+  backdrop-filter: blur(5px);
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* الزهر */
+.dice-container { height: 70px; display: flex; align-items: center; justify-content: center; }
+
+.yalla-dice {
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(145deg, #ffffff 0%, #f0f0f0 100%);
+  border-radius: 14px;
   box-shadow: 
-    0 10px 0 #94a3b8, 
-    0 20px 30px rgba(0,0,0,0.5),
-    inset 0 2px 5px rgba(255,255,255,1);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  border: 2px solid #fff;
+    0 8px 0 #BDBDBD, 
+    0 15px 20px rgba(0,0,0,0.4),
+    inset 0 2px 0 #fff;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  padding: 8px;
+  gap: 4px;
+  border: 1px solid #ddd;
   transition: transform 0.2s;
 }
 
-.dice-3d.empty {
-  color: #94a3b8;
-  font-size: 2rem;
+.yalla-dice.empty {
+  color: #9CA3AF;
+  font-size: 1.8rem;
   font-weight: bold;
-  box-shadow: 0 5px 0 #cbd5e1, 0 10px 20px rgba(0,0,0,0.3);
-}
-
-.dice-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(3, 1fr);
-  gap: 6px;
-  width: 45px;
-  height: 45px;
-}
-
-.dice-dot {
-  border-radius: 50%;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  box-shadow: inset 0 3px 5px rgba(0,0,0,0.6), 0 1px 1px rgba(255,255,255,0.5);
-}
-
-.dice-dot.active { opacity: 1; }
-
-.roll-btn { width: 80%; max-width: 250px; font-size: 1.2rem; }
-.roll-btn.end-turn { background: linear-gradient(135deg, #475569 0%, #334155 100%); color: #f8fafc; box-shadow: 0 10px 20px rgba(0,0,0,0.4), inset 0 2px 0 rgba(255,255,255,0.2); }
-
-.message-text {
-  color: #d4af37;
-  font-size: 1.2rem;
-  font-weight: bold;
-  text-align: center;
-  min-height: 30px;
-  text-shadow: 0 2px 10px rgba(212, 175, 55, 0.5);
-}
-
-/* --- تنسيقات Domino --- */
-.domino-container { width: 100%; display: flex; flex-direction: column; align-items: center; }
-
-.domino-board {
   display: flex;
-  flex-wrap: wrap;
   justify-content: center;
-  gap: 8px;
-  min-height: 140px;
-  background: rgba(30, 41, 59, 0.6);
-  backdrop-filter: blur(12px);
-  padding: 20px;
-  border-radius: 20px;
-  width: 100%;
-  margin-bottom: 20px;
-  box-shadow: inset 0 10px 30px rgba(0,0,0,0.6), 0 10px 20px rgba(0,0,0,0.3);
-  border: 1px solid rgba(255,255,255,0.05);
+  align-items: center;
+  box-shadow: 0 4px 0 #BDBDBD;
 }
 
-.player-hand {
-  width: 100%;
-  background: rgba(30, 41, 59, 0.8);
-  backdrop-filter: blur(12px);
-  padding: 15px;
-  border-radius: 20px;
-  margin-bottom: 15px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.4);
-  border: 1px solid rgba(255,255,255,0.05);
-}
-
-.hand-scroll {
-  display: flex;
-  overflow-x: auto;
-  gap: 10px;
-  padding-bottom: 10px;
-}
-
-.domino-tile {
-  display: flex;
-  flex-direction: column;
-  background: linear-gradient(145deg, #ffffff, #f1f5f9);
-  border-radius: 8px;
-  border: 1px solid #cbd5e1;
-  width: 40px;
-  height: 80px;
-  box-shadow: 
-    0 6px 0 #94a3b8, 
-    0 12px 15px rgba(0,0,0,0.4),
-    inset 0 2px 2px rgba(255,255,255,1);
-  cursor: pointer;
-  transition: all 0.15s;
-  flex-shrink: 0;
-  position: relative;
-}
-
-.domino-tile:active {
-  transform: translateY(6px);
-  box-shadow: 0 0px 0 #94a3b8, 0 5px 10px rgba(0,0,0,0.4);
-}
-
-.domino-tile.disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  box-shadow: 0 2px 0 #94a3b8;
-  transform: translateY(4px);
-  filter: grayscale(1);
-}
-
-.domino-divider {
-  height: 2px;
-  background: #cbd5e1;
-  margin: 3px 5px;
-  box-shadow: 0 1px 0 rgba(255,255,255,1);
-}
-
-.domino-half {
-  flex: 1;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(3, 1fr);
-  padding: 5px;
-  gap: 3px;
-}
-
-.domino-dot {
+.yalla-dot {
   border-radius: 50%;
+  background: #111827;
   width: 100%;
   height: 100%;
   opacity: 0;
+  box-shadow: inset 0 2px 3px rgba(0,0,0,0.8);
 }
+.yalla-dot.active { opacity: 1; }
 
-.domino-dot.active {
-  background: #0f172a;
-  opacity: 1;
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.8), 0 1px 0 rgba(255,255,255,0.8);
+/* أزرار التحكم */
+.yalla-action-btn {
+  width: 80%;
+  max-width: 260px;
+  padding: 14px;
+  font-size: 1.2rem;
 }
+.yalla-action-btn.roll { background: linear-gradient(180deg, #4ADE80 0%, #16A34A 100%); box-shadow: 0 6px 0 #166534, 0 10px 15px rgba(0,0,0,0.3); }
+.yalla-action-btn.pass { background: linear-gradient(180deg, #9CA3AF 0%, #4B5563 100%); box-shadow: 0 6px 0 #374151, 0 10px 15px rgba(0,0,0,0.3); color: #fff; }
