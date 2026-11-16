@@ -20,12 +20,12 @@ jobs:
         with:
           channel: 'stable'
 
-      # السطر الجديد ده هو اللي هيصلح المشكلة
       - name: Configure for Web
         run: flutter create . --platforms web
 
+      # هنا التعديل: ضفنا مسار المستودع
       - name: Build Web
-        run: flutter build web --release
+        run: flutter build web --release --base-href /board-kings/
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
