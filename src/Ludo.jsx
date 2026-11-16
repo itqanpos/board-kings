@@ -1,55 +1,44 @@
 import React, { useState } from 'react';
+import { COLORS, HEX, NAMES, SAFE_SPOTS, getTokenCoords, getInitialTokens } from './ludoEngine';
 
 function Ludo({ onBack }) {
-  const [currentPlayer, setCurrentPlayer] = useState(0); // 0:Red, 1:Green, 2:Blue, 3:Yellow
+  const [tokens, setTokens] = useState(getInitialTokens());
+  const [currentPlayer, setCurrentPlayer] = useState(0);
   const [dice, setDice] = useState(0);
   const [hasRolled, setHasRolled] = useState(false);
-  
-  // حالة القطع (هل هي في البيت أم لا؟) - للتبسيط قطعة واحدة لكل لون
-  const [tokens, setTokens] = useState({ red: true, green: true, blue: true, yellow: true });
-
-  const colors = ['red', 'green', 'blue', 'yellow'];
-  const hexColors = { red: '#e74c3c', green: '#2ecc71', blue: '#3498db', yellow: '#f1c40f' };
-  const names = { 0: 'الأحمر', 1: 'الأخضر', 2: 'الأزرق', 3: 'الأصفر' };
-
-  // إحداثيات البداية لكل لون
-  const startCoords = {
-    red: { x: 1.5, y: 6.5 },
-    green: { x: 8.5, y: 1.5 },
-    blue: { x: 13.5, y: 8.5 },
-    yellow: { x: 6.5, y: 13.5 }
-  };
-
-  // إحداثيات البيت لكل لون
-  const baseCoords = {
-    red: { x: 2, y: 2 },
-    green: { x: 13, y: 2 },
-    blue: { x: 13, y: 13 },
-    yellow: { x: 2, y: 13 }
-  };
-
-  // مسار الـ 52 مربع
-  const path = [
-    [1,6],[2,6],[3,6],[4,6],[5,6],[6,5],[6,4],[6,3],[6,2],[6,1],[7,0],[8,1],[8,2],[8,3],[8,4],[8,5],
-    [9,6],[10,6],[11,6],[12,6],[13,6],[14,7],[13,8],[12,8],[11,8],[10,8],[9,8],[8,9],[8,10],[8,11],[8,12],[8,13],
-    [7,14],[6,13],[6,12],[6,11],[6,10],[6,9],[5,8],[4,8],[3,8],[2,8],[1,8],[0,7]
-  ];
+  const [sixCount, setSixCount] = useState(0);
+  const [message, setMessage] = useState('');
 
   const rollDice = () => {
     if (hasRolled) return;
     const roll = Math.floor(Math.random() * 6) + 1;
+    
+    let newSixCount = sixCount;
+    if (roll === 6) {
+      newSixCount++;
+      if (newSixCount === 3) {
+        setMessage('3 رميات 6! خسرت الدور.');
+        setTimeout(() => endTurn(), 1500);
+        return;
+      }
+    } else {
+      newSixCount = 0;
+    }
+
     setDice(roll);
     setHasRolled(true);
-  };
+    setSixCount(newSixCount);
+    setMessage('');
 
-  const handleTokenClick = (color) => {
-    if (currentPlayer !== colors.indexOf(color)) return;
-    if (!hasRolled) return;
+    // لو مفيش أي حركة متاحة، ننهي الدور تلقائياً
+    const hasValidMove = tokens.some(t => 
+      t.color === COLORS[currentPlayer] && 
+      (t.pos === -1 ? roll === 6 : t.pos + roll <= 57)
+    );
     
-    // لو اللاعب رمى 6 والقطعة في البيت
-    if (dice === 6 && tokens[color]) {
-      setTokens({ ...tokens, [color]: false });
-      endTurn(true); // ينهي الدور ويسمح له بالرمي تاني
+    if (!hasValidMove) {
+      setMessage('لا توجد حركات متاحة');
+      setTimeout(() => endTurn(), 1500);
     }
   };
 
@@ -58,7 +47,55 @@ function Ludo({ onBack }) {
     setHasRolled(false);
     if (!extraTurn) {
       setCurrentPlayer((prev) => (prev + 1) % 4);
+      setSixCount(0); // تصفير عداد الـ6 لو الدور اتغير
     }
+  };
+
+  const moveToken = (tokenId) => {
+    if (!hasRolled) return;
+    
+    setTokens(prevTokens => {
+      let newTokens = [...prevTokens];
+      let token = newTokens.find(t => t.id === tokenId);
+      
+      // لو القطعة في البيت ورمى 6
+      if (token.pos === -1 && dice === 6) {
+        token.pos = 0; // يطلع لخط البداية
+      } 
+      // لو القطعة على الشاشة
+      else if (token.pos !== -1) {
+        if (token.pos + dice > 57) return prevTokens; // حركة غير قانونية
+        token.pos += dice;
+      }
+
+      // التحقق من الأكل (Capture)
+      if (token.pos < 52) {
+        const absPos = (token.pos + (token.color === 'red' ? 0 : token.color === 'green' ? 13 : token.color === 'blue' ? 26 : 39)) % 52;
+        
+        // لو الخانة مش آمنة، ياكل أي خصم عليها
+        if (!SAFE_SPOTS.includes(absPos)) {
+          newTokens.forEach(t => {
+            if (t.color !== token.color && t.pos !== -1 && t.pos < 52) {
+               const tAbsPos = (t.pos + (t.color === 'red' ? 0 : t.color === 'green' ? 13 : t.color === 'blue' ? 26 : 39)) % 52;
+               if (tAbsPos === absPos) {
+                 t.pos = -1; // رجوع للبيت
+                 setMessage(`تم أكل قطعة ${NAMES[t.index]}!`);
+               }
+            }
+          });
+        }
+      }
+      return newTokens;
+    });
+
+    // لو اللاعب خلص كل قطعه (وصلوا 57)
+    const playerTokens = tokens.filter(t => t.color === COLORS[currentPlayer]);
+    if (playerTokens.every(t => t.pos === 57)) {
+      setMessage(`🎉 مبروك ${NAMES[currentPlayer]} فاز باللعبة!`);
+      return;
+    }
+
+    endTurn(dice === 6); // لو رمى 6 يلعب تاني
   };
 
   return (
@@ -66,7 +103,7 @@ function Ludo({ onBack }) {
       <div className="ludo-header">
         <button className="back-btn" onClick={onBack}>رجوع</button>
         <div className="turn-indicator">
-          دور: <span style={{ color: hexColors[colors[currentPlayer]] }}>{names[currentPlayer]}</span>
+          دور: <span style={{ color: HEX[COLORS[currentPlayer]] }}>{NAMES[currentPlayer]}</span>
         </div>
       </div>
       
@@ -74,29 +111,26 @@ function Ludo({ onBack }) {
         <svg viewBox="0 0 15 15" className="ludo-svg">
           <rect width="15" height="15" fill="#fff" stroke="#333" strokeWidth="0.1" />
           
-          {/* رسم مسار الـ 52 مربع */}
-          {path.map((pos, i) => (
-            <rect key={i} x={pos[0]} y={pos[1]} width="1" height="1" fill="#ecf0f1" stroke="#333" strokeWidth="0.1" />
+          {/* مسار اللعب الرئيسي */}
+          {[...Array(52)].map((_, i) => {
+             // بنرسم المسار
+             const [x, y] = getTokenCoords('red', i, 0); // نستخدم دالة الإحداثيات لأي لون عشان نرسم الخط
+             return <rect key={i} x={x} y={y} width="1" height="1" fill="#ecf0f1" stroke="#333" strokeWidth="0.1" />;
+          })}
+
+          {/* مسارات النهاية */}
+          {COLORS.map(c => [0,1,2,3,4].map(i => {
+             const [x, y] = getTokenCoords(c, 52+i, 0);
+             return <rect key={`${c}-home-${i}`} x={x} y={y} width="1" height="1" fill={HEX[c]} stroke="#333" strokeWidth="0.1" />;
+          }))}
+
+          {/* البيوت */}
+          {COLORS.map(c => (
+             <g key={`base-${c}`}>
+               <rect x={c === 'red' || c === 'yellow' ? 0 : 9} y={c === 'red' || c === 'green' ? 0 : 9} width="6" height="6" fill={HEX[c]} stroke="#333" strokeWidth="0.1" />
+               <rect x={c === 'red' || c === 'yellow' ? 1 : 10} y={c === 'red' || c === 'green' ? 1 : 10} width="4" height="4" fill="#fff" stroke="#333" strokeWidth="0.1" />
+             </g>
           ))}
-
-          {/* مسارات النهاية (Home Paths) */}
-          {[1,2,3,4,5].map(i => <rect key={`hr${i}`} x={i} y={7} width="1" height="1" fill="#e74c3c" stroke="#333" strokeWidth="0.1" />)}
-          {[1,2,3,4,5].map(i => <rect key={`hg${i}`} x={7} y={i} width="1" height="1" fill="#2ecc71" stroke="#333" strokeWidth="0.1" />)}
-          {[1,2,3,4,5].map(i => <rect key={`hb${i}`} x={14-i} y={7} width="1" height="1" fill="#3498db" stroke="#333" strokeWidth="0.1" />)}
-          {[1,2,3,4,5].map(i => <rect key={`hy${i}`} x={7} y={14-i} width="1" height="1" fill="#f1c40f" stroke="#333" strokeWidth="0.1" />)}
-
-          {/* المنازل الأربعة */}
-          <rect x="0" y="0" width="6" height="6" fill="#e74c3c" stroke="#333" strokeWidth="0.1" />
-          <rect x="1" y="1" width="4" height="4" fill="#fff" stroke="#333" strokeWidth="0.1" />
-          
-          <rect x="9" y="0" width="6" height="6" fill="#2ecc71" stroke="#333" strokeWidth="0.1" />
-          <rect x="10" y="1" width="4" height="4" fill="#fff" stroke="#333" strokeWidth="0.1" />
-          
-          <rect x="0" y="9" width="6" height="6" fill="#f1c40f" stroke="#333" strokeWidth="0.1" />
-          <rect x="1" y="10" width="4" height="4" fill="#fff" stroke="#333" strokeWidth="0.1" />
-          
-          <rect x="9" y="9" width="6" height="6" fill="#3498db" stroke="#333" strokeWidth="0.1" />
-          <rect x="10" y="10" width="4" height="4" fill="#fff" stroke="#333" strokeWidth="0.1" />
 
           {/* المنتصف */}
           <polygon points="6,6 9,6 7.5,7.5" fill="#e74c3c" stroke="#333" strokeWidth="0.1"/>
@@ -104,17 +138,19 @@ function Ludo({ onBack }) {
           <polygon points="9,9 6,9 7.5,7.5" fill="#3498db" stroke="#333" strokeWidth="0.1"/>
           <polygon points="6,9 6,6 7.5,7.5" fill="#f1c40f" stroke="#333" strokeWidth="0.1"/>
 
-          {/* القطع */}
-          {colors.map(color => {
-            const isHome = tokens[color];
-            const pos = isHome ? baseCoords[color] : startCoords[color];
+          {/* رسم كل القطع الـ 16 */}
+          {tokens.map(t => {
+            const [cx, cy] = getTokenCoords(t.color, t.pos, parseInt(t.id.split('-')[1]));
+            const isMyTurn = t.color === COLORS[currentPlayer];
+            const canMove = isMyTurn && hasRolled && (t.pos === -1 ? dice === 6 : t.pos + dice <= 57);
+            
             return (
               <circle 
-                key={color}
-                cx={pos.x} cy={pos.y} r="0.4" 
-                fill={hexColors[color]} stroke="#333" strokeWidth="0.1"
-                className={`token ${currentPlayer === colors.indexOf(color) && hasRolled && dice === 6 && isHome ? 'clickable' : ''}`}
-                onClick={() => handleTokenClick(color)}
+                key={t.id}
+                cx={cx} cy={cy} r="0.4" 
+                fill={HEX[t.color]} stroke="#333" strokeWidth="0.1"
+                className={`token ${canMove ? 'clickable' : ''}`}
+                onClick={() => canMove && moveToken(t.id)}
               />
             );
           })}
@@ -122,18 +158,16 @@ function Ludo({ onBack }) {
       </div>
 
       <div className="ludo-controls">
-        <div className="dice-display" style={{ color: dice > 0 ? hexColors[colors[currentPlayer]] : '#333' }}>
+        <div className="dice-display" style={{ color: dice > 0 ? HEX[COLORS[currentPlayer]] : '#333' }}>
           {dice > 0 ? dice : '-'}
         </div>
         
+        {message && <p className="message-text">{message}</p>}
+
         {!hasRolled ? (
           <button className="roll-btn" onClick={rollDice}>رمي النرد</button>
         ) : (
-          <div className="action-buttons">
-             {dice !== 6 && <button className="roll-btn" onClick={() => endTurn(false)}>إنهاء الدور</button>}
-             {dice === 6 && <p className="hint-text">اختر قطعة للخروج أو إنهاء الدور</p>}
-             {dice === 6 && <button className="roll-btn" onClick={() => endTurn(false)}>تخطي</button>}
-          </div>
+          <button className="roll-btn" onClick={() => endTurn(false)}>إنهاء الدور</button>
         )}
       </div>
     </div>
