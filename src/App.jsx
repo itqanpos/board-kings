@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Ludo from './Ludo'; // استدعاء ملف اللودو
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState('menu');
@@ -18,11 +19,7 @@ function App() {
       )}
 
       {currentScreen === 'ludo' && (
-        <div className="game-screen">
-          <h2>لعبة Ludo</h2>
-          <p>جاري بناء اللوحة...</p>
-          <button onClick={() => setCurrentScreen('menu')}>رجوع للقائمة</button>
-        </div>
+        <Ludo onBack={() => setCurrentScreen('menu')} />
       )}
 
       {currentScreen === 'domino' && (
