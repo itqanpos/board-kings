@@ -61,3 +61,62 @@ button:active {
   color: #c9c9c9;
   border: 1px solid #c9c9c9;
 }
+/* تنسيقات لعبة Ludo */
+.ludo-container {
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.ludo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.back-btn {
+  background: transparent;
+  color: #d4af37;
+  border: 1px solid #d4af37;
+  padding: 5px 15px;
+  font-size: 1rem;
+}
+
+.ludo-board {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background-color: #fff;
+  border: 4px solid #333;
+  border-radius: 8px;
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr 1fr;
+  padding: 4px;
+  box-sizing: border-box;
+}
+
+.home-base {
+  border: 2px solid #333;
+  border-radius: 4px;
+}
+.red-base { background-color: #e74c3c; }
+.green-base { background-color: #2ecc71; }
+.yellow-base { background-color: #f1c40f; }
+.blue-base { background-color: #3498db; }
+
+.play-path {
+  background-color: #ecf0f1;
+  border: 2px solid #333;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.center-triangle {
+  width: 50%;
+  height: 50%;
+  background-color: #333;
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
