@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 
-// دالة لتوليد قطع الدومينو الـ 28
 const generateDeck = () => {
   let deck = [];
   for (let i = 0; i <= 6; i++) {
@@ -38,11 +37,10 @@ function Domino({ onBack }) {
   const [deck, setDeck] = useState(generateDeck());
   const [player1Hand, setPlayer1Hand] = useState([]);
   const [player2Hand, setPlayer2Hand] = useState([]);
-  const [board, setBoard] = useState([]); // القطع اللي على الطاولة
-  const [turn, setTurn] = useState(1); // 1 أو 2
+  const [board, setBoard] = useState([]);
+  const [turn, setTurn] = useState(1);
   const [message, setMessage] = useState('قم بسحب قطعة لتبدأ');
 
-  // بدء اللعبة وتوزيع القطع
   const startGame = () => {
     let newDeck = generateDeck();
     setPlayer1Hand(newDeck.slice(0, 7));
@@ -59,21 +57,18 @@ function Domino({ onBack }) {
     let rightEnd = newBoard.length > 0 ? newBoard[newBoard.length - 1].bottom : null;
 
     if (newBoard.length === 0) {
-      newBoard.push(tile); // أول قطعة
+      newBoard.push(tile);
     } else {
-      // لو بتنطبق على الشمال
       if (tile.bottom === leftEnd) {
-        newBoard.unshift({ ...tile, top: tile.bottom, bottom: tile.top }); // عكس القطعة
+        newBoard.unshift({ ...tile, top: tile.bottom, bottom: tile.top });
       } else if (tile.top === leftEnd) {
         newBoard.unshift(tile);
-      } 
-      // لو بتنطبق على اليمين
-      else if (tile.top === rightEnd) {
+      } else if (tile.top === rightEnd) {
         newBoard.push(tile);
       } else if (tile.bottom === rightEnd) {
         newBoard.push({ ...tile, top: tile.bottom, bottom: tile.top });
       } else {
-        return; // حركة غير قانونية
+        return;
       }
     }
 
@@ -86,7 +81,6 @@ function Domino({ onBack }) {
       return;
     }
 
-    // تغيير الدور
     setTurn(turn === 1 ? 2 : 1);
     setMessage(`دور اللاعب ${turn === 1 ? 2 : 1}`);
   };
@@ -113,14 +107,12 @@ function Domino({ onBack }) {
 
       <p className="message-text">{message}</p>
 
-      {/* طاولة اللعب */}
       <div className="domino-board">
         {board.map((t, i) => (
           <DominoTile key={i} tile={t} disabled={true} />
         ))}
       </div>
 
-      {/* يد اللاعب 1 */}
       <div className="player-hand">
         <h4 style={{ color: '#e74c3c', margin: '10px 0' }}>قطعك (اللاعب 1)</h4>
         <div className="hand-scroll">
@@ -134,7 +126,6 @@ function Domino({ onBack }) {
         </div>
       </div>
 
-      {/* يد اللاعب 2 (مخفية شوية للتبسيط) */}
       <div className="player-hand">
         <h4 style={{ color: '#3498db', margin: '10px 0' }}>قطع اللاعب 2</h4>
         <div className="hand-scroll">
