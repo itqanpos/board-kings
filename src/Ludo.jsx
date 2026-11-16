@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { COLORS, HEX, NAMES, SAFE_SPOTS, getTokenCoords, getInitialTokens } from './ludoEngine';
 
-// دالة لرسم النرد بشكل احترافي (نقط)
 const DiceFace = ({ value, color }) => {
   const dots = {
     1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8]
   };
   return (
-    <div className="dice-3d" style={{ borderColor: color }}>
+    <div className="dice-3d">
       <div className="dice-grid">
         {[...Array(9)].map((_, i) => (
           <div key={i} className={`dice-dot ${dots[value]?.includes(i) ? 'active' : ''}`} style={{ backgroundColor: color }} />
@@ -118,7 +117,6 @@ function Ludo({ onBack }) {
       
       <div className="ludo-board-wrapper">
         <svg viewBox="0 0 15 15" className="ludo-svg">
-          {/* تعريف التدرجات اللونية للوحة */}
           <defs>
             <radialGradient id="gradRed" cx="30%" cy="30%"><stop offset="0%" stopColor="#ff6b6b"/><stop offset="100%" stopColor="#c0392b"/></radialGradient>
             <radialGradient id="gradGreen" cx="30%" cy="30%"><stop offset="0%" stopColor="#55efc4"/><stop offset="100%" stopColor="#27ae60"/></radialGradient>
@@ -131,7 +129,6 @@ function Ludo({ onBack }) {
 
           <rect width="15" height="15" fill="#f8f9fa" stroke="#333" strokeWidth="0.2" />
           
-          {/* رسم المسار */}
           {[...Array(52)].map((_, i) => {
              const [x, y] = getTokenCoords('red', i, 0); 
              const isSafe = SAFE_SPOTS.includes(i);
@@ -140,13 +137,11 @@ function Ludo({ onBack }) {
              );
           })}
 
-          {/* مسارات النهاية */}
           {COLORS.map(c => [0,1,2,3,4].map(i => {
              const [x, y] = getTokenCoords(c, 52+i, 0);
              return <rect key={`${c}-home-${i}`} x={x} y={y} width="1" height="1" fill={`url(#grad${c.charAt(0).toUpperCase() + c.slice(1)})`} stroke="#fff" strokeWidth="0.05" />;
           }))}
 
-          {/* البيوت */}
           {COLORS.map(c => (
              <g key={`base-${c}`}>
                <rect x={c === 'red' || c === 'yellow' ? 0 : 9} y={c === 'red' || c === 'green' ? 0 : 9} width="6" height="6" fill={`url(#grad${c.charAt(0).toUpperCase() + c.slice(1)})`} stroke="#fff" strokeWidth="0.2" />
@@ -154,13 +149,11 @@ function Ludo({ onBack }) {
              </g>
           ))}
 
-          {/* المنتصف */}
           <polygon points="6,6 9,6 7.5,7.5" fill="url(#gradRed)" stroke="#fff" strokeWidth="0.05"/>
           <polygon points="9,6 9,9 7.5,7.5" fill="url(#gradGreen)" stroke="#fff" strokeWidth="0.05"/>
           <polygon points="9,9 6,9 7.5,7.5" fill="url(#gradBlue)" stroke="#fff" strokeWidth="0.05"/>
           <polygon points="6,9 6,6 7.5,7.5" fill="url(#gradYellow)" stroke="#fff" strokeWidth="0.05"/>
 
-          {/* رسم القطع بتأثير 3D */}
           {tokens.map(t => {
             const [cx, cy] = getTokenCoords(t.color, t.pos, parseInt(t.id.split('-')[1]));
             const isMyTurn = t.color === COLORS[currentPlayer];
@@ -168,8 +161,12 @@ function Ludo({ onBack }) {
             
             return (
               <g key={t.id} className={`token-group ${canMove ? 'clickable' : ''}`} onClick={() => canMove && moveToken(t.id)}>
-                <circle cx={cx + 0.1} cy={cy + 0.2} r="0.45" fill="rgba(0,0,0,0.4)" />
-                <circle cx={cx} cy={cy} r="0.45" fill={`url(#grad${t.color.charAt(0).toUpperCase() + t.color.slice(1)})`} stroke="#fff" strokeWidth="0.1" filter="url(#shadow)" />
+                {/* ظل القطعة */}
+                <circle cx={cx + 0.15} cy={cy + 0.25} r="0.45" fill="rgba(0,0,0,0.6)" />
+                {/* جسم القطعة بتدرج لوني */}
+                <circle cx={cx} cy={cy} r="0.45" fill={`url(#grad${t.color.charAt(0).toUpperCase() + t.color.slice(1)})`} stroke="#fff" strokeWidth="0.15" />
+                {/* لمعة القطعة */}
+                <circle cx={cx - 0.15} cy={cy - 0.15} r="0.15" fill="rgba(255,255,255,0.6)" />
               </g>
             );
           })}
