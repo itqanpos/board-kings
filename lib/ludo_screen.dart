@@ -42,7 +42,6 @@ class _LudoScreenState extends State<LudoScreen> {
     'https://api.dicebear.com/7.x/avataaars/png?seed=Lily',
   ];
 
-  // دالة رمي الزهر مع أنيميشن
   void rollDice() async {
     if (hasRolled || isRolling || isMoving) return;
     
@@ -51,7 +50,6 @@ class _LudoScreenState extends State<LudoScreen> {
       message = '';
     });
 
-    // أنيميشن التغيير السريع
     for (int i = 0; i < 10; i++) {
       await Future.delayed(const Duration(milliseconds: 50));
       if (mounted) {
@@ -87,16 +85,17 @@ class _LudoScreenState extends State<LudoScreen> {
   }
 
   void endTurn({bool extraTurn = false}) {
-    setState(() {
-      diceValue = 0;
-      hasRolled = false;
-      if (!extraTurn) {
-        currentPlayer = (currentPlayer + 1) % 4;
-      }
-    });
+    if (mounted) {
+      setState(() {
+        diceValue = 0;
+        hasRolled = false;
+        if (!extraTurn) {
+          currentPlayer = (currentPlayer + 1) % 4;
+        }
+      });
+    }
   }
 
-  // دالة تحريك القطعة خطوة بخطوة
   void moveToken(Token token) async {
     if (!hasRolled || isMoving) return;
     if (token.color != LudoEngine.colors[currentPlayer]) return;
@@ -112,12 +111,10 @@ class _LudoScreenState extends State<LudoScreen> {
       return;
     }
 
-    // لو القطعة في البيت وطلعت بـ 6
     if (token.pos == -1) {
       setState(() => token.pos = 0);
       await Future.delayed(const Duration(milliseconds: 300));
     } else {
-      // تحريك خانة خانة
       int steps = targetPos - token.pos;
       for (int i = 0; i < steps; i++) {
         await Future.delayed(const Duration(milliseconds: 150));
@@ -125,7 +122,7 @@ class _LudoScreenState extends State<LudoScreen> {
       }
     }
 
-    // منطق الأكل بعد الحركة
+    // فحص الأكل
     if (token.pos < 52) {
       int absPos = (token.pos + LudoEngine.startOffsets[token.color]!) % 52;
       if (!LudoEngine.safeSpots.contains(absPos)) {
@@ -146,6 +143,18 @@ class _LudoScreenState extends State<LudoScreen> {
     }
   }
 
+  // دالة لحساب مكان القطع لو أكتر من قطعة في نفس الخانة
+  List<Offset> _getStackedTokenOffsets(List<Token> allTokens, Token currentToken) {
+    List<Token> tokensInSameSpot = allTokens.where((t) => t.pos == currentToken.pos && t.pos != -1).toList();
+    if (tokensInSameSpot.length <= 1) return [Offset.zero];
+
+    int index = tokensInSameSpot.indexOf(currentToken);
+    // توزيع القطع بشكل دائري أو جانبي لو أكتر من واحدة
+    double offsetX = (index % 2 == 0 ? -0.15 : 0.15);
+    double offsetY = (index < 2 ? -0.15 : 0.15);
+    return [Offset(offsetX, offsetY)];
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -154,16 +163,19 @@ class _LudoScreenState extends State<LudoScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF2E7D32), Color(0xFF1B5E20)],
+            colors: [Color(0xFF1E3B1E), Color(0xFF0D1A0D)], // خلفية خشبية داكنة
           ),
         ),
         child: SafeArea(
           child: Column(
             children: [
-              // شريط اللاعبين
+              // 1. شريط اللاعبين
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                color: Colors.black.withOpacity(0.2),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.3),
+                  border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.1), width: 1))
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: List.generate(4, (index) {
@@ -176,13 +188,13 @@ class _LudoScreenState extends State<LudoScreen> {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: isActive ? LudoEngine.colorValues[LudoEngine.colors[index]]! : Colors.white30,
+                              color: isActive ? LudoEngine.colorValues[LudoEngine.colors[index]]! : Colors.white24,
                               width: isActive ? 3 : 2,
                             ),
                             boxShadow: isActive ? [BoxShadow(color: LudoEngine.colorValues[LudoEngine.colors[index]]!, blurRadius: 12, spreadRadius: 2)] : [],
                           ),
                           child: CircleAvatar(
-                            radius: isActive ? 22 : 18,
+                            radius: isActive ? 24 : 20,
                             backgroundImage: NetworkImage(avatarImages[index]),
                             backgroundColor: Colors.white,
                           ),
@@ -191,9 +203,9 @@ class _LudoScreenState extends State<LudoScreen> {
                         Text(
                           LudoEngine.names[index]!,
                           style: TextStyle(
-                            color: isActive ? Colors.yellow : Colors.white70,
+                            color: isActive ? Colors.yellow : Colors.white60,
                             fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                            fontSize: 11,
+                            fontSize: 12,
                           ),
                         ),
                       ],
@@ -202,7 +214,7 @@ class _LudoScreenState extends State<LudoScreen> {
                 ),
               ),
               
-              // اللوحة
+              // 2. اللوحة
               Expanded(
                 child: Center(
                   child: AspectRatio(
@@ -210,66 +222,72 @@ class _LudoScreenState extends State<LudoScreen> {
                     child: Container(
                       margin: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        border: Border.all(color: const Color(0xFF5D4037), width: 8),
-                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFF3E2723), width: 10), // إطار خشبي غامق
+                        borderRadius: BorderRadius.circular(12),
                         color: Colors.white,
-                        boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 20, offset: Offset(0, 10))],
+                        boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 25, offset: Offset(0, 15))],
                       ),
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          double cellSize = constraints.maxWidth / 15;
-                          return Stack(
-                            children: [
-                              CustomPaint(
-                                size: Size.infinite,
-                                painter: LudoBoardPainter(),
-                              ),
-                              ...tokens.map((token) {
-                                int tokenIndex = int.parse(token.id.split('-')[1]);
-                                final coords = LudoEngine.getTokenCoords(token.color, token.pos, tokenIndex);
-                                
-                                bool canMove = hasRolled && !isMoving && token.color == LudoEngine.colors[currentPlayer] && (token.pos == -1 ? diceValue == 6 : token.pos + diceValue <= 57);
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(2),
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            double cellSize = constraints.maxWidth / 15;
+                            return Stack(
+                              children: [
+                                CustomPaint(
+                                  size: Size.infinite,
+                                  painter: LudoBoardPainter(),
+                                ),
+                                ...tokens.map((token) {
+                                  int tokenIndex = int.parse(token.id.split('-')[1]);
+                                  final coords = LudoEngine.getTokenCoords(token.color, token.pos, tokenIndex);
+                                  
+                                  // حساب الإزاحة لو أكتر من قطعة في نفس المكان
+                                  final offset = _getStackedTokenOffsets(tokens, token).first;
 
-                                return AnimatedPositioned(
-                                  duration: const Duration(milliseconds: 150),
-                                  curve: Curves.easeInOut,
-                                  left: coords[0] * cellSize,
-                                  top: coords[1] * cellSize,
-                                  child: GestureDetector(
-                                    onTap: () => moveToken(token),
-                                    child: Container(
-                                      width: cellSize,
-                                      height: cellSize,
-                                      padding: EdgeInsets.all(cellSize * 0.1),
-                                      child: AnimatedScale(
-                                        scale: canMove ? 1.2 : 1.0,
-                                        duration: const Duration(milliseconds: 300),
-                                        child: Image.network(
-                                          tokenImages[token.color]!,
-                                          fit: BoxFit.contain,
+                                  bool canMove = hasRolled && !isMoving && token.color == LudoEngine.colors[currentPlayer] && (token.pos == -1 ? diceValue == 6 : token.pos + diceValue <= 57);
+
+                                  return AnimatedPositioned(
+                                    duration: const Duration(milliseconds: 150),
+                                    curve: Curves.easeInOut,
+                                    left: (coords[0] + offset.dx) * cellSize,
+                                    top: (coords[1] + offset.dy) * cellSize,
+                                    child: GestureDetector(
+                                      onTap: () => moveToken(token),
+                                      child: Container(
+                                        width: cellSize,
+                                        height: cellSize,
+                                        padding: EdgeInsets.all(cellSize * 0.05),
+                                        child: AnimatedScale(
+                                          scale: canMove ? 1.3 : 1.0,
+                                          duration: const Duration(milliseconds: 200),
+                                          child: Image.network(
+                                            tokenImages[token.color]!,
+                                            fit: BoxFit.contain,
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                );
-                              }).toList(),
-                            ],
-                          );
-                        }
+                                  );
+                                }).toList(),
+                              ],
+                            );
+                          }
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
 
-              // الشريط السفلي
+              // 3. الشريط السفلي
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 child: Column(
                   children: [
                     if (message.isNotEmpty)
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.only(bottom: 8),
                         child: Text(message, style: const TextStyle(color: Colors.yellow, fontSize: 16, fontWeight: FontWeight.bold)),
                       ),
                     Row(
@@ -288,12 +306,13 @@ class _LudoScreenState extends State<LudoScreen> {
                           onTap: rollDice,
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
-                            width: isRolling ? 65 : 75,
-                            height: isRolling ? 65 : 75,
+                            width: isRolling ? 65 : 80,
+                            height: isRolling ? 65 : 80,
                             decoration: BoxDecoration(
                               color: Colors.white,
-                              borderRadius: BorderRadius.circular(15),
-                              boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 10, offset: Offset(0, 8))],
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 12, offset: Offset(0, 8))],
+                              border: Border.all(color: Colors.grey.shade300, width: 2),
                             ),
                             child: diceValue == 0 
                               ? const Center(child: Text('🎲', style: TextStyle(fontSize: 45)))
@@ -308,10 +327,11 @@ class _LudoScreenState extends State<LudoScreen> {
                           ? ElevatedButton(
                               onPressed: () => endTurn(),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.amber,
+                                backgroundColor: Colors.amber.shade600,
                                 foregroundColor: Colors.black,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                                elevation: 5,
                               ),
                               child: const Text('تخطي', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                             )
@@ -330,23 +350,23 @@ class _LudoScreenState extends State<LudoScreen> {
 
   Widget _buildCircleBtn(IconData icon) {
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.4),
+        color: Colors.white.withOpacity(0.1),
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white30, width: 2),
+        border: Border.all(color: Colors.white24, width: 2),
       ),
       child: Icon(icon, color: Colors.white, size: 24),
     );
   }
 }
 
-// رسام اللوحة (محسن بتدرجات وظلال ونجوم)
+// رسام اللوحة النهائي
 class LudoBoardPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..style = PaintingStyle.fill;
-    final borderPaint = Paint()..style = PaintingStyle.stroke..strokeWidth = 1..color = Colors.grey.shade300;
+    final borderPaint = Paint()..style = PaintingStyle.stroke..strokeWidth = 1.5..color = Colors.black26;
     double cellSize = size.width / 15;
 
     void drawCell(int x, int y, Color color, {bool isSafe = false}) {
@@ -356,12 +376,11 @@ class LudoBoardPainter extends CustomPainter {
       canvas.drawRect(rect, borderPaint);
       
       if (isSafe) {
-        // رسم نجمة في الخانات الآمنة
         final starPaint = Paint()..color = Colors.grey.shade400;
         Path star = Path();
         double cx = (x + 0.5) * cellSize;
         double cy = (y + 0.5) * cellSize;
-        double r = cellSize * 0.2;
+        double r = cellSize * 0.25;
         star.moveTo(cx, cy - r);
         star.lineTo(cx + r * 0.3, cy - r * 0.3);
         star.lineTo(cx + r, cy - r * 0.3);
@@ -377,12 +396,14 @@ class LudoBoardPainter extends CustomPainter {
       }
     }
 
+    // المسار
     for (int i = 0; i < LudoEngine.mainPath.length; i++) {
       final pos = LudoEngine.mainPath[i];
       bool isSafe = LudoEngine.safeSpots.contains(i);
       drawCell(pos[0], pos[1], Colors.white, isSafe: isSafe);
     }
 
+    // مسارات النهاية
     for (var color in LudoEngine.colors) {
       for (int i = 0; i < 5; i++) {
         final pos = LudoEngine.getTokenCoords(color, 52 + i, 0);
@@ -390,33 +411,31 @@ class LudoBoardPainter extends CustomPainter {
       }
     }
 
-    // البيوت بتدرج لوني وظل داخلي
+    // البيوت
     void drawBase(int x, int y, Color color) {
       Rect baseRect = Rect.fromLTWH(x * cellSize, y * cellSize, 6 * cellSize, 6 * cellSize);
       
-      // التدرج اللوني
       paint.shader = ui.Gradient.linear(
         baseRect.topLeft,
         baseRect.bottomRight,
-        [color.withOpacity(0.8), color],
+        [color.withOpacity(0.9), color.withOpacity(0.6)],
       );
       
-      RRect rrect = RRect.fromRectAndRadius(baseRect, Radius.circular(cellSize * 0.8));
+      RRect rrect = RRect.fromRectAndRadius(baseRect, Radius.circular(cellSize * 0.5));
       canvas.drawRRect(rrect, paint);
-      paint.shader = null; // إعادة ضبط
+      paint.shader = null;
 
-      // المربع الأبيض الداخلي مع ظل
       paint.color = Colors.white;
       RRect inner = RRect.fromRectAndRadius(
-        Rect.fromLTWH((x + 1) * cellSize, (y + 1) * cellSize, 4 * cellSize, 4 * cellSize),
-        Radius.circular(cellSize * 0.5),
+        Rect.fromLTWH((x + 1.2) * cellSize, (y + 1.2) * cellSize, 3.6 * cellSize, 3.6 * cellSize),
+        Radius.circular(cellSize * 0.3),
       );
       canvas.drawRRect(inner, paint);
       
-      // ظل داخلي للمربع الأبيض
+      // ظل داخلي للبيت
       paint.style = PaintingStyle.stroke;
-      paint.color = Colors.black.withOpacity(0.1);
-      paint.strokeWidth = 4;
+      paint.color = Colors.black.withOpacity(0.15);
+      paint.strokeWidth = 6;
       canvas.drawRRect(inner, paint);
       paint.style = PaintingStyle.fill;
     }
@@ -426,7 +445,7 @@ class LudoBoardPainter extends CustomPainter {
     drawBase(0, 9, LudoEngine.colorValues['yellow']!);
     drawBase(9, 9, LudoEngine.colorValues['blue']!);
 
-    // المثلثات الوسطى
+    // المثلثات
     Path centerTriangle = Path();
     double cx = 7.5 * cellSize;
     double cy = 7.5 * cellSize;
