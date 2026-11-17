@@ -19,7 +19,7 @@ class _LudoScreenState extends State<LudoScreen> {
   void rollDice() {
     if (hasRolled || isMoving) return;
     setState(() {
-      diceValue = (1 + (DateTime.now().millisecond % 6)); // Random roll 1-6
+      diceValue = (1 + (DateTime.now().millisecond % 6));
       hasRolled = true;
       message = 'رمى ${LudoEngine.names[currentPlayer]} الرقم $diceValue';
     });
@@ -114,13 +114,14 @@ class _LudoScreenState extends State<LudoScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF2D2D44),
-        title: const Text('🎉 مبروك الفوز!', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-        content: Text('الفائز في هذه الجولة هو اللاعب $winnerName!', style: const TextStyle(color: Colors.white, fontSize: 16), textAlign: TextAlign.center),
+        backgroundColor: const Color(0xFF161622),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: const BorderSide(color: Colors.amber, width: 2)),
+        title: const Text('🎉 مبروك الفوز الاحترافي!', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+        content: Text('الفائز في هذه المعركة هو اللاعب $winnerName!', style: const TextStyle(color: Colors.white, fontSize: 16), textAlign: TextAlign.center),
         actions: [
           Center(
             child: ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.amber, foregroundColor: Colors.black),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.amber, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12)),
               onPressed: () {
                 Navigator.pop(context);
                 setState(() {
@@ -128,10 +129,10 @@ class _LudoScreenState extends State<LudoScreen> {
                   currentPlayer = 0;
                   hasRolled = false;
                   diceValue = null;
-                  message = 'بدأت لعبة جديدة! دور اللاعب: الأحمر';
+                  message = 'بدأت ملحمة جديدة! دور اللاعب: الأحمر';
                 });
               },
-              child: const Text('إعادة اللعب'),
+              child: const Text('معركة جديدة', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ),
         ],
@@ -147,47 +148,43 @@ class _LudoScreenState extends State<LudoScreen> {
     if (sameSpotTokens.length <= 1) return [baseCoords[0].toDouble(), baseCoords[1].toDouble()];
 
     int indexInSpot = sameSpotTokens.indexWhere((t) => t.id == currentToken.id);
-    double offsetX = 0.0;
-    double offsetY = 0.0;
-    if (indexInSpot == 1) {
-      offsetX = 0.2;
-    } else if (indexInSpot == 2) {
-      offsetY = 0.2;
-    } else if (indexInSpot == 3) {
-      offsetX = 0.2;
-      offsetY = 0.2;
-    }
+    double offsetX = (indexInSpot == 1 || indexInSpot == 3) ? 0.15 : 0.0;
+    double offsetY = (indexInSpot >= 2) ? 0.15 : 0.0;
     return [baseCoords[0].toDouble() + offsetX, baseCoords[1].toDouble() + offsetY];
   }
 
   @override
   Widget build(BuildContext context) {
-    double screenSize = MediaQuery.of(context).size.width > 500 ? 500 : MediaQuery.of(context).size.width;
+    double screenSize = MediaQuery.of(context).size.width > 500 ? 500 : MediaQuery.of(context).size.width - 24;
     double cellSize = screenSize / 15;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF1E1E2C),
+      backgroundColor: const Color(0xFF0B0B10),
       appBar: AppBar(
-        title: const Text('BOARD KINGS — LUDO', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: const Color(0xFF2D2D44),
+        title: const Text('BOARD KINGS — AAA EDITION', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2, color: Colors.amber)),
+        backgroundColor: const Color(0xFF13131F),
+        elevation: 0,
         centerTitle: true,
       ),
       body: Column(
         children: [
+          // Professional Status HUD
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             margin: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFF2D2D44),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white12),
+              color: const Color(0xFF161622),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.amber.withOpacity(0.3), width: 1.5),
+              boxShadow: [BoxShadow(color: Colors.amber.withOpacity(0.1), blurRadius: 10)],
             ),
             child: Text(
               message,
-              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
           ),
+          // Masterpiece Board Area
           Expanded(
             child: Center(
               child: SizedBox(
@@ -195,81 +192,103 @@ class _LudoScreenState extends State<LudoScreen> {
                 height: screenSize,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 10, spreadRadius: 2)],
+                    color: const Color(0xFF13131F),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Colors.white12, width: 2),
+                    boxShadow: const [
+                      BoxShadow(color: Colors.black87, blurRadius: 24, spreadRadius: 4),
+                      BoxShadow(color: Color(0x22FFFFFF), blurRadius: 4, spreadRadius: 1),
+                    ],
                   ),
-                  child: Stack(
-                    children: [
-                      CustomPaint(
-                        size: Size(screenSize, screenSize),
-                        painter: LudoBoardPainter(),
-                      ),
-                      ...tokens.map((token) {
-                        final coords = _getStackedOffset(token, tokens);
-                        return AnimatedPositioned(
-                          duration: const Duration(milliseconds: 300),
-                          left: coords[0] * cellSize,
-                          top: coords[1] * cellSize,
-                          child: GestureDetector(
-                            onTap: () => moveToken(token),
-                            child: Container(
-                              width: cellSize * 0.8,
-                              height: cellSize * 0.8,
-                              decoration: BoxDecoration(
-                                color: LudoEngine.colorValues[token.color],
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 2),
-                                boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 4, spreadRadius: 1)],
-                              ),
-                              child: Center(
-                                child: Text(
-                                  '${token.index + 1}',
-                                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: Stack(
+                      children: [
+                        CustomPaint(
+                          size: Size(screenSize, screenSize),
+                          painter: AAAProLudoBoardPainter(),
+                        ),
+                        ...tokens.map((token) {
+                          final coords = _getStackedOffset(token, tokens);
+                          bool isActivePlayer = token.color == LudoEngine.colors[currentPlayer];
+                          return AnimatedPositioned(
+                            duration: const Duration(milliseconds: 350),
+                            curve: Curves.easeInOut,
+                            left: coords[0] * cellSize,
+                            top: coords[1] * cellSize,
+                            child: GestureDetector(
+                              onTap: () => moveToken(token),
+                              child: Container(
+                                width: cellSize * 0.85,
+                                height: cellSize * 0.85,
+                                decoration: BoxDecoration(
+                                  color: LudoEngine.colorValues[token.color],
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 2.5),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: isActivePlayer ? LudoEngine.colorValues[token.color]!.withOpacity(0.8) : Colors.black45,
+                                      blurRadius: isActivePlayer ? 10 : 4,
+                                      spreadRadius: isActivePlayer ? 2 : 0,
+                                    ),
+                                  ],
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    '${token.index + 1}',
+                                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        );
-                      }),
-                    ],
+                          );
+                        }),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
+          // Luxury Bottom HUD & Controls
           Container(
             padding: const EdgeInsets.all(16),
-            color: const Color(0xFF2D2D44),
+            decoration: const BoxDecoration(
+              color: Color(0xFF13131F),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              border: Border(top: BorderSide(color: Colors.white10)),
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text('اللاعب الحالي', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                    const SizedBox(height: 4),
+                    const Text('دور اللاعب النشط', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                    const SizedBox(height: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
                         color: LudoEngine.colorValues[LudoEngine.colors[currentPlayer]],
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [BoxShadow(color: LudoEngine.colorValues[LudoEngine.colors[currentPlayer]]!.withOpacity(0.5), blurRadius: 8)],
                       ),
                       child: Text(
                         LudoEngine.names[currentPlayer]!,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14),
                       ),
                     ),
                   ],
                 ),
                 ElevatedButton.icon(
                   onPressed: hasRolled ? null : rollDice,
-                  icon: const Icon(Icons.casino),
-                  label: Text(diceValue == null ? 'رمي النرد' : 'الرقم: $diceValue'),
+                  icon: const Icon(Icons.casino, color: Colors.black),
+                  label: Text(diceValue == null ? 'رمي النرد الفاخر' : 'الرقم: $diceValue', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w900)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.amber,
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    elevation: 8,
                   ),
                 ),
               ],
@@ -281,29 +300,82 @@ class _LudoScreenState extends State<LudoScreen> {
   }
 }
 
-class LudoBoardPainter extends CustomPainter {
+class AAAProLudoBoardPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..style = PaintingStyle.fill;
     double cellSize = size.width / 15;
 
-    paint.color = Colors.red.shade100;
-    canvas.drawRect(Rect.fromLTWH(0, 0, cellSize * 6, cellSize * 6), paint);
+    // 1. Draw Corner Bases with Premium Dark Tint
+    void drawBase(double x, double y, Color color) {
+      paint.color = color.withOpacity(0.2);
+      canvas.drawRect(Rect.fromLTWH(x * cellSize, y * cellSize, cellSize * 6, cellSize * 6), paint);
 
-    paint.color = Colors.green.shade100;
-    canvas.drawRect(Rect.fromLTWH(cellSize * 9, 0, cellSize * 6, cellSize * 6), paint);
+      // Inner White Box for Bases
+      paint.color = const Color(0xFF1E1E2C);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH((x + 1) * cellSize, (y + 1) * cellSize, cellSize * 4, cellSize * 4),
+          const Radius.circular(12),
+        ),
+        paint,
+      );
 
-    paint.color = Colors.amber.shade100;
-    canvas.drawRect(Rect.fromLTWH(0, cellSize * 9, cellSize * 6, cellSize * 6), paint);
+      // Draw 4 Base Token Circles
+      paint.color = color.withOpacity(0.8);
+      for (int i = 0; i < 4; i++) {
+        double cx = (x + 1.5 + (i % 2) * 2) * cellSize;
+        double cy = (y + 1.5 + (i ~/ 2) * 2) * cellSize;
+        canvas.drawCircle(Offset(cx, cy), cellSize * 0.7, paint);
+      }
+    }
 
-    paint.color = Colors.blue.shade100;
-    canvas.drawRect(Rect.fromLTWH(cellSize * 9, cellSize * 9, cellSize * 6, cellSize * 6), paint);
+    drawBase(0, 0, const Color(0xFFFF334B)); // Red
+    drawBase(9, 0, const Color(0xFF00E676)); // Green
+    drawBase(0, 9, const Color(0xFFFFD600)); // Yellow
+    drawBase(9, 9, const Color(0xFF2979FF)); // Blue
 
-    paint.color = Colors.grey.shade200;
+    // 2. Draw Center Home Destination (Triangle Triad)
+    paint.color = const Color(0xFF1E1E2C);
     canvas.drawRect(Rect.fromLTWH(cellSize * 6, cellSize * 6, cellSize * 3, cellSize * 3), paint);
 
+    // Center triangles
+    final pathRed = Path()
+      ..moveTo(cellSize * 6, cellSize * 6)
+      ..lineTo(cellSize * 9, cellSize * 6)
+      ..lineTo(cellSize * 7.5, cellSize * 7.5)
+      ..close();
+    paint.color = const Color(0xFFFF334B);
+    canvas.drawPath(pathRed, paint);
+
+    final pathGreen = Path()
+      ..moveTo(cellSize * 9, cellSize * 6)
+      ..lineTo(cellSize * 9, cellSize * 9)
+      ..lineTo(cellSize * 7.5, cellSize * 7.5)
+      ..close();
+    paint.color = const Color(0xFF00E676);
+    canvas.drawPath(pathGreen, paint);
+
+    final pathBlue = Path()
+      ..moveTo(cellSize * 9, cellSize * 9)
+      ..lineTo(cellSize * 6, cellSize * 9)
+      ..lineTo(cellSize * 7.5, cellSize * 7.5)
+      ..close();
+    paint.color = const Color(0xFF2979FF);
+    canvas.drawPath(pathBlue, paint);
+
+    final pathYellow = Path()
+      ..moveTo(cellSize * 6, cellSize * 9)
+      ..lineTo(cellSize * 6, cellSize * 6)
+      ..lineTo(cellSize * 7.5, cellSize * 7.5)
+      ..close();
+    paint.color = const Color(0xFFFFD600);
+    canvas.drawPath(pathYellow, paint);
+
+    // 3. Draw Grid Lines & Borders with Neon Accent
     paint.style = PaintingStyle.stroke;
-    paint.color = Colors.grey.shade400;
+    paint.color = Colors.white10;
+    paint.strokeWidth = 1;
     for (int i = 0; i <= 15; i++) {
       canvas.drawLine(Offset(i * cellSize, 0), Offset(i * cellSize, size.height), paint);
       canvas.drawLine(Offset(0, i * cellSize), Offset(size.width, i * cellSize), paint);
