@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'ludo_screen.dart'; // استدعاء الشاشة الجديدة
+import 'ludo_screen.dart';
 
 void main() {
   runApp(const BoardKingsApp());
@@ -11,69 +11,14 @@ class BoardKingsApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Board Kings',
+      title: 'BOARD KINGS — Ludo',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        primaryColor: const Color(0xFFD4AF37),
+        primarySwatch: Colors.amber,
+        scaffoldBackgroundColor: const Color(0xFF1E1E2C),
       ),
-      home: const MainMenu(),
-    );
-  }
-}
-
-class MainMenu extends StatelessWidget {
-  const MainMenu({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              'BOARD KINGS',
-              style: TextStyle(
-                fontSize: 40,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFFD4AF37),
-                letterSpacing: 2,
-              ),
-            ),
-            const SizedBox(height: 50),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFD4AF37),
-                foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
-                textStyle: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LudoScreen()),
-                );
-              },
-              child: const Text('Ludo - لودو'),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFD4AF37),
-                foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
-                textStyle: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              onPressed: () {
-                // لسه هنجهزها
-              },
-              child: const Text('Domino - دومينو'),
-            ),
-          ],
-        ),
-      ),
+      home: const LudoScreen(),
     );
   }
 }
