@@ -61,21 +61,21 @@ class LudoEngine {
 
   static const List<int> safeSpots = [0, 8, 13, 21, 26, 34, 39, 47];
 
-  // Main path coordinates as List<List<double>> so indexing (pos[0], pos[1]) works correctly
-  static final List<List<double>> mainPath = List.generate(
+  // Main path coordinates as List<List<int>> matching int expectations in drawCell
+  static final List<List<int>> mainPath = List.generate(
     52,
-    (index) => [(index % 15).toDouble(), (index ~/ 15).toDouble()],
+    (index) => [index % 15, index ~/ 15],
   );
 
-  static List<double> getTokenCoords(String color, int pos, int index) {
+  static List<int> getTokenCoords(String color, int pos, int index) {
     if (pos == -1) {
-      double baseX = 2.0 + (index % 2) * 2.0;
-      double baseY = 2.0 + (index ~/ 2) * 2.0;
+      int baseX = 2 + (index % 2) * 2;
+      int baseY = 2 + (index ~/ 2) * 2;
       return [baseX, baseY];
     } else if (pos >= 52) {
-      return [7.0, 7.0];
+      return [7, 7];
     } else {
-      return [(pos % 15).toDouble(), (pos ~/ 15).toDouble()];
+      return [pos % 15, pos ~/ 15];
     }
   }
 }
