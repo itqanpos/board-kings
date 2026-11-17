@@ -12,19 +12,18 @@ class _LudoScreenState extends State<LudoScreen> {
   List<Token> tokens = getInitialTokens();
   int currentPlayer = 0; // 0: red, 1: green, 2: yellow, 3: blue
   int? diceValue;
-  bool hasRolled = hasRolled = false;
+  bool hasRolled = false;
   bool isMoving = false;
   String message = 'دور اللاعب: الأحمر';
 
   void rollDice() {
     if (hasRolled || isMoving) return;
     setState(() {
-      diceValue = LudoEngine.rollDice();
+      diceValue = (1 + (DateTime.now().millisecond % 6)); // Random roll 1-6
       hasRolled = true;
       message = 'رمى ${LudoEngine.names[currentPlayer]} الرقم $diceValue';
     });
 
-    // Check if player has any valid moves
     bool canAnyMove = tokens
         .where((t) => t.color == LudoEngine.colors[currentPlayer])
         .any((t) => t.pos == -1 ? diceValue == 6 : t.pos + diceValue! <= 58);
@@ -65,7 +64,6 @@ class _LudoScreenState extends State<LudoScreen> {
 
     int targetPos = token.pos == -1 ? 0 : token.pos + dice;
 
-    // Check for captures
     if (targetPos <= 51 && !LudoEngine.safeSpots.contains(targetPos)) {
       for (var other in tokens) {
         if (other.color != token.color && other.pos != -1 && other.pos <= 51) {
@@ -85,7 +83,6 @@ class _LudoScreenState extends State<LudoScreen> {
       token.pos = targetPos;
     });
 
-    // Check Win
     bool playerWon = tokens
         .where((t) => t.color == LudoEngine.colors[currentPlayer])
         .every((t) => t.pos == 58);
@@ -142,7 +139,6 @@ class _LudoScreenState extends State<LudoScreen> {
     );
   }
 
-  // Calculate stacked offsets if multiple tokens are on the exact same board coordinate
   List<double> _getStackedOffset(Token currentToken, List<Token> allTokens) {
     final baseCoords = LudoEngine.getTokenCoords(currentToken.color, currentToken.pos, currentToken.index);
     if (currentToken.pos == -1) return [baseCoords[0].toDouble(), baseCoords[1].toDouble()];
@@ -178,7 +174,6 @@ class _LudoScreenState extends State<LudoScreen> {
       ),
       body: Column(
         children: [
-          // Status Header
           Container(
             padding: const EdgeInsets.all(12),
             margin: const EdgeInsets.all(12),
@@ -193,7 +188,6 @@ class _LudoScreenState extends State<LudoScreen> {
               textAlign: TextAlign.center,
             ),
           ),
-          // Game Board Area
           Expanded(
             child: Center(
               child: SizedBox(
@@ -211,7 +205,6 @@ class _LudoScreenState extends State<LudoScreen> {
                         size: Size(screenSize, screenSize),
                         painter: LudoBoardPainter(),
                       ),
-                      // Render Tokens with Stacked Offsets
                       ...tokens.map((token) {
                         final coords = _getStackedOffset(token, tokens);
                         return AnimatedPositioned(
@@ -245,7 +238,6 @@ class _LudoScreenState extends State<LudoScreen> {
               ),
             ),
           ),
-          // Controls & Dice Area
           Container(
             padding: const EdgeInsets.all(16),
             color: const Color(0xFF2D2D44),
@@ -295,7 +287,6 @@ class LudoBoardPainter extends CustomPainter {
     final paint = Paint()..style = PaintingStyle.fill;
     double cellSize = size.width / 15;
 
-    // Draw Bases
     paint.color = Colors.red.shade100;
     canvas.drawRect(Rect.fromLTWH(0, 0, cellSize * 6, cellSize * 6), paint);
 
@@ -308,11 +299,9 @@ class LudoBoardPainter extends CustomPainter {
     paint.color = Colors.blue.shade100;
     canvas.drawRect(Rect.fromLTWH(cellSize * 9, cellSize * 9, cellSize * 6, cellSize * 6), paint);
 
-    // Draw Center Home
     paint.color = Colors.grey.shade200;
     canvas.drawRect(Rect.fromLTWH(cellSize * 6, cellSize * 6, cellSize * 3, cellSize * 3), paint);
 
-    // Draw Grid Lines / Safe spots decoration
     paint.style = PaintingStyle.stroke;
     paint.color = Colors.grey.shade400;
     for (int i = 0; i <= 15; i++) {
