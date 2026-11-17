@@ -12,7 +12,7 @@ class _LudoScreenState extends State<LudoScreen> {
   List<Token> tokens = getInitialTokens();
   int currentPlayer = 0; // 0: red, 1: green, 2: yellow, 3: blue
   int? diceValue;
-  bool hasRolled = false;
+  bool hasRolled = hasRolled = false;
   bool isMoving = false;
   String message = 'دور اللاعب: الأحمر';
 
@@ -30,7 +30,7 @@ class _LudoScreenState extends State<LudoScreen> {
         .any((t) => t.pos == -1 ? diceValue == 6 : t.pos + diceValue! <= 58);
 
     if (!canAnyMove) {
-      Future.delayed(const Duration(seconds: 1500), () {
+      Future.delayed(const Duration(milliseconds: 1500), () {
         if (mounted) {
           setState(() {
             hasRolled = false;
@@ -74,7 +74,7 @@ class _LudoScreenState extends State<LudoScreen> {
           if (otherAbsPos == currentAbsPos) {
             setState(() {
               other.pos = -1;
-              message = 'تم أكل قطعة المنافس!';
+              message = 'تم أكل قطعة المنافس وإعادتها للقاعدة!';
             });
           }
         }
@@ -91,9 +91,7 @@ class _LudoScreenState extends State<LudoScreen> {
         .every((t) => t.pos == 58);
 
     if (playerWon) {
-      setState(() {
-        message = '🎉 الفائز هو اللاعب ${LudoEngine.names[currentPlayer]}!';
-      });
+      _showWinDialog(LudoEngine.names[currentPlayer]!);
       return;
     }
 
@@ -114,8 +112,63 @@ class _LudoScreenState extends State<LudoScreen> {
     });
   }
 
+  void _showWinDialog(String winnerName) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF2D2D44),
+        title: const Text('🎉 مبروك الفوز!', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+        content: Text('الفائز في هذه الجولة هو اللاعب $winnerName!', style: const TextStyle(color: Colors.white, fontSize: 16), textAlign: TextAlign.center),
+        actions: [
+          Center(
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.amber, foregroundColor: Colors.black),
+              onPressed: () {
+                Navigator.pop(context);
+                setState(() {
+                  tokens = getInitialTokens();
+                  currentPlayer = 0;
+                  hasRolled = false;
+                  diceValue = null;
+                  message = 'بدأت لعبة جديدة! دور اللاعب: الأحمر';
+                });
+              },
+              child: const Text('إعادة اللعب'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Calculate stacked offsets if multiple tokens are on the exact same board coordinate
+  List<double> _getStackedOffset(Token currentToken, List<Token> allTokens) {
+    final baseCoords = LudoEngine.getTokenCoords(currentToken.color, currentToken.pos, currentToken.index);
+    if (currentToken.pos == -1) return [baseCoords[0].toDouble(), baseCoords[1].toDouble()];
+
+    final sameSpotTokens = allTokens.where((t) => t.pos == currentToken.pos && t.pos != -1).toList();
+    if (sameSpotTokens.length <= 1) return [baseCoords[0].toDouble(), baseCoords[1].toDouble()];
+
+    int indexInSpot = sameSpotTokens.indexWhere((t) => t.id == currentToken.id);
+    double offsetX = 0.0;
+    double offsetY = 0.0;
+    if (indexInSpot == 1) {
+      offsetX = 0.2;
+    } else if (indexInSpot == 2) {
+      offsetY = 0.2;
+    } else if (indexInSpot == 3) {
+      offsetX = 0.2;
+      offsetY = 0.2;
+    }
+    return [baseCoords[0].toDouble() + offsetX, baseCoords[1].toDouble() + offsetY];
+  }
+
   @override
   Widget build(BuildContext context) {
+    double screenSize = MediaQuery.of(context).size.width > 500 ? 500 : MediaQuery.of(context).size.width;
+    double cellSize = screenSize / 15;
+
     return Scaffold(
       backgroundColor: const Color(0xFF1E1E2C),
       appBar: AppBar(
@@ -128,10 +181,11 @@ class _LudoScreenState extends State<LudoScreen> {
           // Status Header
           Container(
             padding: const EdgeInsets.all(12),
-            margin: const EdgeInsets.all(8),
+            margin: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: const Color(0xFF2D2D44),
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white12),
             ),
             child: Text(
               message,
@@ -142,10 +196,10 @@ class _LudoScreenState extends State<LudoScreen> {
           // Game Board Area
           Expanded(
             child: Center(
-              child: AspectRatio(
-                aspectRatio: 1,
+              child: SizedBox(
+                width: screenSize,
+                height: screenSize,
                 child: Container(
-                  margin: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
@@ -154,31 +208,31 @@ class _LudoScreenState extends State<LudoScreen> {
                   child: Stack(
                     children: [
                       CustomPaint(
-                        size: Size.infinite,
+                        size: Size(screenSize, screenSize),
                         painter: LudoBoardPainter(),
                       ),
-                      // Render Tokens
+                      // Render Tokens with Stacked Offsets
                       ...tokens.map((token) {
-                        final coords = LudoEngine.getTokenCoords(token.color, token.pos, token.index);
+                        final coords = _getStackedOffset(token, tokens);
                         return AnimatedPositioned(
                           duration: const Duration(milliseconds: 300),
-                          left: coords[0] * (MediaQuery.of(context).size.width / 15),
-                          top: coords[1] * (MediaQuery.of(context).size.width / 15),
+                          left: coords[0] * cellSize,
+                          top: coords[1] * cellSize,
                           child: GestureDetector(
                             onTap: () => moveToken(token),
                             child: Container(
-                              width: 28,
-                              height: 28,
+                              width: cellSize * 0.8,
+                              height: cellSize * 0.8,
                               decoration: BoxDecoration(
                                 color: LudoEngine.colorValues[token.color],
                                 shape: BoxShape.circle,
                                 border: Border.all(color: Colors.white, width: 2),
-                                boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                                boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 4, spreadRadius: 1)],
                               ),
                               child: Center(
                                 child: Text(
                                   '${token.index + 1}',
-                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                                 ),
                               ),
                             ),
@@ -201,10 +255,10 @@ class _LudoScreenState extends State<LudoScreen> {
                 Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text('اللاعب الحالي', style: TextStyle(color: Colors.white70)),
+                    const Text('اللاعب الحالي', style: TextStyle(color: Colors.white70, fontSize: 12)),
                     const SizedBox(height: 4),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                       decoration: BoxDecoration(
                         color: LudoEngine.colorValues[LudoEngine.colors[currentPlayer]],
                         borderRadius: BorderRadius.circular(8),
@@ -253,6 +307,10 @@ class LudoBoardPainter extends CustomPainter {
 
     paint.color = Colors.blue.shade100;
     canvas.drawRect(Rect.fromLTWH(cellSize * 9, cellSize * 9, cellSize * 6, cellSize * 6), paint);
+
+    // Draw Center Home
+    paint.color = Colors.grey.shade200;
+    canvas.drawRect(Rect.fromLTWH(cellSize * 6, cellSize * 6, cellSize * 3, cellSize * 3), paint);
 
     // Draw Grid Lines / Safe spots decoration
     paint.style = PaintingStyle.stroke;
