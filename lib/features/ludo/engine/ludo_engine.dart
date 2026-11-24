@@ -5,10 +5,10 @@ enum LudoColor { red, green, yellow, blue }
 class LudoPiece {
   final String id;
   final LudoColor color;
-  final int index; // -1: base, 0-51: main track, 52-57: home stretch, 58: finished
-  int position; // absolute board position or track step
+  final int index;
+  final int position;
 
-  LudoPiece({
+  const LudoPiece({
     required this.id,
     required this.color,
     required this.index,
@@ -33,103 +33,146 @@ class LudoGameState {
   final LudoColor? winner;
 
   LudoGameState({
-    required this.pieces,
+    required Map<LudoColor, List<LudoPiece>> pieces,
     required this.currentTurn,
     this.diceValue,
     this.consecutiveSixes = 0,
     this.winner,
-  });
+  }) : pieces = Map.unmodifiable({
+          for (final entry in pieces.entries)
+            entry.key: List<LudoPiece>.unmodifiable(entry.value),
+        });
 
   factory LudoGameState.initial() {
-    Map<LudoColor, List<LudoPiece>> initialPieces = {};
-    for (var color in LudoColor.values) {
-      initialPieces[color] = List.generate(
-        4,
-        (i) => LudoPiece(id: '${color.name}_$i', color: color, index: i, position: -1),
-      );
-    }
-    return LudoGameState(pieces: initialPieces, currentTurn: LudoColor.red);
+    return LudoGameState(
+      pieces: {
+        for (final color in LudoColor.values)
+          color: List.generate(
+            4,
+            (index) => LudoPiece(
+              id: '${color.name}_$index',
+              color: color,
+              index: index,
+            ),
+          ),
+      },
+      currentTurn: LudoColor.red,
+    );
   }
 
   LudoGameState copyWith({
     Map<LudoColor, List<LudoPiece>>? pieces,
     LudoColor? currentTurn,
     int? diceValue,
+    bool clearDiceValue = false,
     int? consecutiveSixes,
     LudoColor? winner,
+    bool clearWinner = false,
   }) {
     return LudoGameState(
       pieces: pieces ?? this.pieces,
       currentTurn: currentTurn ?? this.currentTurn,
-      diceValue: diceValue ?? this.diceValue,
+      diceValue: clearDiceValue ? null : diceValue ?? this.diceValue,
       consecutiveSixes: consecutiveSixes ?? this.consecutiveSixes,
-      winner: winner ?? this.winner,
+      winner: clearWinner ? null : winner ?? this.winner,
     );
   }
 }
 
 class LudoEngine {
+  static const int trackLength = 52;
+  static const int finishPosition = 58;
   static const List<int> safeZones = [0, 8, 13, 21, 26, 34, 39, 47];
+  static const Map<LudoColor, int> startOffsets = {
+    LudoColor.red: 0,
+    LudoColor.green: 13,
+    LudoColor.yellow: 26,
+    LudoColor.blue: 39,
+  };
 
-  // Safe random generator for local play
-  static final Random _random = Random();
+  static final Random _random = Random.secure();
 
-  static int rollDice() {
-    return _random.nextInt(6) + 1;
-  }
+  static int rollDice() => _random.nextInt(6) + 1;
 
-  static bool isValidMove(LudoGameState state, LudoColor color, String pieceId, int dice) {
-    if (state.currentTurn != color || state.diceValue != dice || state.winner != null) {
-      return false;
-    }
-
-    final piece = state.pieces[color]?.firstWhere((p) => p.id == pieceId);
-    if (piece == null) return false;
-
-    // Finished pieces cannot move
-    if (piece.position == 58) return false;
-
-    // In base, requires a 6 to exit
-    if (piece.position == -1) {
-      return dice == 6;
-    }
-
-    // Moving on track or home stretch
-    if (piece.position + dice > 58) {
-      return false; // Exact roll needed for final home position (58)
-    }
-
-    return true;
-  }
-
-  static LudoGameState applyMove(LudoGameState state, LudoColor color, String pieceId, int dice) {
-    if (!isValidMove(state, color, pieceId, dice)) {
+  /// Records a resolved die value. A third consecutive six forfeits that roll.
+  static LudoGameState recordRoll(LudoGameState state, int value) {
+    if (state.winner != null || state.diceValue != null || value < 1 || value > 6) {
       return state;
     }
 
-    final updatedPieces = Map<LudoColor, List<LudoPiece>>.from(
-      state.pieces.map((k, v) => MapEntry(k, v.map((p) => p.copyWith()).toList())),
-    );
-
-    final piece = updatedPieces[color]!.firstWhere((p) => p.id == pieceId);
-
-    int newPosition;
-    if (piece.position == -1) {
-      newPosition = 0; // Spawn point
-    } else {
-      newPosition = piece.position + dice;
+    final sixes = value == 6 ? state.consecutiveSixes + 1 : 0;
+    if (sixes >= 3) {
+      return state.copyWith(
+        currentTurn: _getNextTurn(state.currentTurn),
+        consecutiveSixes: 0,
+        clearDiceValue: true,
+      );
     }
 
-    piece.position = newPosition;
+    return state.copyWith(diceValue: value, consecutiveSixes: sixes);
+  }
 
-    // Check for captures on main track (excluding safe zones)
-    bool captured = false;
-    if (newPosition <= 51 && !safeZones.contains(newPosition)) {
-      for (var entry in updatedPieces.entries) {
-        if (entry.key != color) {
-          for (var otherPiece in entry.value) {
-            if (otherPiece.position == newPosition) {
-              otherPiece.position = -1; // Send back to base
+  static bool isValidMove(
+    LudoGameState state,
+    LudoColor color,
+    String pieceId,
+    int dice,
+  ) {
+    if (state.currentTurn != color ||
+        state.diceValue != dice ||
+        dice < 1 ||
+        dice > 6 ||
+        state.winner != null) {
+      return false;
+    }
+
+    final pieces = state.pieces[color];
+    if (pieces == null) return false;
+    final pieceIndex = pieces.indexWhere((piece) => piece.id == pieceId);
+    if (pieceIndex == -1) return false;
+
+    final piece = pieces[pieceIndex];
+    if (piece.color != color) return false;
+    final position = piece.position;
+    if (position == -1) return dice == 6;
+    if (position < 0 || position >= finishPosition) return false;
+    return position + dice <= finishPosition;
+  }
+
+  static LudoGameState applyMove(
+    LudoGameState state,
+    LudoColor color,
+    String pieceId,
+    int dice,
+  ) {
+    if (!isValidMove(state, color, pieceId, dice)) return state;
+
+    final updatedPieces = <LudoColor, List<LudoPiece>>{
+      for (final entry in state.pieces.entries)
+        entry.key: entry.value.map((piece) => piece.copyWith()).toList(),
+    };
+    final movingPieces = updatedPieces[color];
+    if (movingPieces == null) return state;
+    final pieceIndex = movingPieces.indexWhere((piece) => piece.id == pieceId);
+    if (pieceIndex == -1) return state;
+
+    final piece = movingPieces[pieceIndex];
+    final newPosition = piece.position == -1 ? 0 : piece.position + dice;
+    movingPieces[pieceIndex] = piece.copyWith(position: newPosition);
+
+    var captured = false;
+    if (newPosition < trackLength) {
+      final absoluteSquare = _absoluteSquare(color, newPosition);
+      if (!safeZones.contains(absoluteSquare)) {
+        for (final entry in updatedPieces.entries) {
+          if (entry.key == color) continue;
+          final opponentPieces = entry.value;
+          for (var index = 0; index < opponentPieces.length; index++) {
+            final opponent = opponentPieces[index];
+            if (opponent.position >= 0 &&
+                opponent.position < trackLength &&
+                _absoluteSquare(entry.key, opponent.position) == absoluteSquare) {
+              opponentPieces[index] = opponent.copyWith(position: -1);
               captured = true;
             }
           }
@@ -137,48 +180,42 @@ class LudoEngine {
       }
     }
 
-    // Check for win condition
-    bool hasWon = updatedPieces[color]!.every((p) => p.position == 58);
-    LudoColor? winner = hasWon ? color : state.winner;
-
-    // Turn management: Rolling a 6 or capturing grants an extra turn
-    LudoColor nextTurn = state.currentTurn;
-    int newConsecutiveSixes = state.consecutiveSixes;
-
-    if (dice == 6) {
-      newConsecutiveSixes++;
-      if (newConsecutiveSixes >= 3) {
-        // Penalty for 3 sixes: reset piece if moved and skip turn
-        piece.position = -1;
-        newConsecutiveSixes = 0;
-        nextTurn = _getNextTurn(state.currentTurn);
-      }
-    } else {
-      newConsecutiveSixes = 0;
-      if (!captured) {
-        nextTurn = _getNextTurn(state.currentTurn);
-      }
-    }
+    final hasWon = movingPieces.every((candidate) => candidate.position == finishPosition);
+    final nextTurn = dice == 6 || captured || hasWon
+        ? state.currentTurn
+        : _getNextTurn(state.currentTurn);
+    final nextSixes = dice == 6 ? state.consecutiveSixes : 0;
 
     return state.copyWith(
       pieces: updatedPieces,
       currentTurn: nextTurn,
-      diceValue: null,
-      consecutiveSixes: newConsecutiveSixes,
-      winner: winner,
+      clearDiceValue: true,
+      consecutiveSixes: nextSixes,
+      winner: hasWon ? color : null,
+      clearWinner: !hasWon,
     );
   }
 
+  /// Clears a roll only when the current player has no legal piece movement.
+  static LudoGameState skipIfNoLegalMove(LudoGameState state) {
+    final dice = state.diceValue;
+    if (dice == null || state.winner != null) return state;
+    final hasMove = (state.pieces[state.currentTurn] ?? const <LudoPiece>[])
+        .any((piece) => isValidMove(state, state.currentTurn, piece.id, dice));
+    if (hasMove) return state;
+
+    return state.copyWith(
+      currentTurn: dice == 6 ? state.currentTurn : _getNextTurn(state.currentTurn),
+      clearDiceValue: true,
+      consecutiveSixes: dice == 6 ? state.consecutiveSixes : 0,
+    );
+  }
+
+  static int _absoluteSquare(LudoColor color, int progress) =>
+      (startOffsets[color]! + progress) % trackLength;
+
   static LudoColor _getNextTurn(LudoColor current) {
-    switch (current) {
-      case LudoColor.red:
-        return LudoColor.green;
-      case LudoColor.green:
-        return LudoColor.yellow;
-      case LudoColor.yellow:
-        return LudoColor.blue;
-      case LudoColor.blue:
-        return LudoColor.red;
-    }
+    final index = (LudoColor.values.indexOf(current) + 1) % LudoColor.values.length;
+    return LudoColor.values[index];
   }
 }

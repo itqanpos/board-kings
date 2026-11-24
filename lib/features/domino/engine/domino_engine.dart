@@ -12,7 +12,7 @@ class DominoTile {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is DominoTile && runtimeType == other.runtimeType && id == other.id;
+      identical(this, other) || other is DominoTile && id == other.id;
 
   @override
   int get hashCode => id.hashCode;
@@ -21,6 +21,8 @@ class DominoTile {
 class DominoGameState {
   final List<DominoTile> board;
   final Map<int, List<DominoTile>> playerHands;
+  final List<DominoTile> drawPile;
+  final int? openingTileId;
   final int currentTurnPlayer;
   final int? leftEnd;
   final int? rightEnd;
@@ -28,70 +30,103 @@ class DominoGameState {
   final int? winner;
 
   DominoGameState({
-    required this.board,
-    required this.playerHands,
+    required List<DominoTile> board,
+    required Map<int, List<DominoTile>> playerHands,
     required this.currentTurnPlayer,
+    List<DominoTile> drawPile = const [],
+    this.openingTileId,
     this.leftEnd,
     this.rightEnd,
     this.consecutivePasses = 0,
     this.winner,
-  });
+  })  : board = List.unmodifiable(board),
+        playerHands = Map.unmodifiable({
+          for (final entry in playerHands.entries)
+            entry.key: List<DominoTile>.unmodifiable(entry.value),
+        }),
+        drawPile = List.unmodifiable(drawPile);
 
-  factory DominoGameState.initial(int playerCount) {
-    List<DominoTile> allTiles = [];
-    int id = 0;
-    for (int i = 0; i <= 6; i++) {
-      for (int j = i; j <= 6; j++) {
-        allTiles.add(DominoTile(id: id++, left: i, right: j));
+  factory DominoGameState.initial(int playerCount, {Random? random}) {
+    if (playerCount < 2 || playerCount > 4) {
+      throw ArgumentError.value(playerCount, 'playerCount', 'Must be between 2 and 4');
+    }
+
+    final tiles = <DominoTile>[];
+    var id = 0;
+    for (var left = 0; left <= 6; left++) {
+      for (var right = left; right <= 6; right++) {
+        tiles.add(DominoTile(id: id++, left: left, right: right));
       }
     }
-    allTiles.shuffle(Random());
+    (random ?? Random()).shuffle(tiles);
 
-    Map<int, List<DominoTile>> hands = {};
-    int tilesPerPlayer = (playerCount == 2) ? 7 : 5;
-    int tileIndex = 0;
-
-    for (int p = 0; p < playerCount; p++) {
-      hands[p] = allTiles.sublist(tileIndex, tileIndex + tilesPerPlayer);
+    final tilesPerPlayer = playerCount == 2 ? 7 : 5;
+    var tileIndex = 0;
+    final hands = <int, List<DominoTile>>{};
+    for (var player = 0; player < playerCount; player++) {
+      hands[player] = tiles.sublist(tileIndex, tileIndex + tilesPerPlayer);
       tileIndex += tilesPerPlayer;
     }
 
-    // Determine starting player by highest double
-    int startingPlayer = 0;
-    int highestDouble = -1;
-    for (int p = 0; p < playerCount; p++) {
-      for (var tile in hands[p]!) {
+    var startingPlayer = 0;
+    int? openingTileId;
+    var highestDouble = -1;
+    var highestTileValue = -1;
+    for (final entry in hands.entries) {
+      for (final tile in entry.value) {
         if (tile.isDouble && tile.left > highestDouble) {
           highestDouble = tile.left;
-          startingPlayer = p;
+          startingPlayer = entry.key;
+          openingTileId = tile.id;
+        }
+      }
+    }
+    if (highestDouble == -1) {
+      for (final entry in hands.entries) {
+        for (final tile in entry.value) {
+          if (tile.totalValue > highestTileValue) {
+            highestTileValue = tile.totalValue;
+            startingPlayer = entry.key;
+            openingTileId = tile.id;
+          }
         }
       }
     }
 
     return DominoGameState(
-      board: [],
+      board: const [],
       playerHands: hands,
       currentTurnPlayer: startingPlayer,
+      drawPile: tiles.sublist(tileIndex),
+      openingTileId: openingTileId,
     );
   }
 
   DominoGameState copyWith({
     List<DominoTile>? board,
     Map<int, List<DominoTile>>? playerHands,
+    List<DominoTile>? drawPile,
     int? currentTurnPlayer,
+    int? openingTileId,
+    bool clearOpeningTileId = false,
     int? leftEnd,
+    bool clearLeftEnd = false,
     int? rightEnd,
+    bool clearRightEnd = false,
     int? consecutivePasses,
     int? winner,
+    bool clearWinner = false,
   }) {
     return DominoGameState(
       board: board ?? this.board,
       playerHands: playerHands ?? this.playerHands,
+      drawPile: drawPile ?? this.drawPile,
       currentTurnPlayer: currentTurnPlayer ?? this.currentTurnPlayer,
-      leftEnd: leftEnd ?? this.leftEnd,
-      rightEnd: rightEnd ?? this.rightEnd,
+      openingTileId: clearOpeningTileId ? null : openingTileId ?? this.openingTileId,
+      leftEnd: clearLeftEnd ? null : leftEnd ?? this.leftEnd,
+      rightEnd: clearRightEnd ? null : rightEnd ?? this.rightEnd,
       consecutivePasses: consecutivePasses ?? this.consecutivePasses,
-      winner: winner ?? this.winner,
+      winner: clearWinner ? null : winner ?? this.winner,
     );
   }
 }
@@ -106,58 +141,78 @@ class DominoEngine {
   }
 
   static bool hasAnyValidMove(DominoGameState state, int player) {
-    if (state.board.isEmpty) return true;
-    final hand = state.playerHands[player] ?? [];
+    final hand = state.playerHands[player];
+    if (hand == null || hand.isEmpty || state.winner != null) return false;
+    if (state.board.isEmpty) {
+      return player == state.currentTurnPlayer &&
+          (state.openingTileId == null || hand.any((tile) => tile.id == state.openingTileId));
+    }
     return hand.any((tile) => canPlayTile(state, tile));
   }
 
-  static DominoGameState playTile(DominoGameState state, int player, DominoTile tile, bool playOnLeft) {
+  static DominoGameState playTile(
+    DominoGameState state,
+    int player,
+    DominoTile tile,
+    bool playOnLeft,
+  ) {
     if (state.currentTurnPlayer != player || state.winner != null) return state;
+    final hand = state.playerHands[player];
+    if (hand == null) return state;
 
-    final hand = state.playerHands[player] ?? [];
-    if (!hand.contains(tile)) return state;
+    final tileIndex = hand.indexWhere((candidate) => candidate.id == tile.id);
+    if (tileIndex == -1) return state;
+    final actualTile = hand[tileIndex];
+    if (state.board.isEmpty &&
+        state.openingTileId != null &&
+        actualTile.id != state.openingTileId) {
+      return state;
+    }
 
-    List<DominoTile> newBoard = List.from(state.board);
-    int? newLeft = state.leftEnd;
-    int? newRight = state.rightEnd;
+    final newBoard = List<DominoTile>.of(state.board);
+    var newLeft = state.leftEnd;
+    var newRight = state.rightEnd;
 
     if (newBoard.isEmpty) {
-      newBoard.add(tile);
-      newLeft = tile.left;
-      newRight = tile.right;
-    } else {
-      if (playOnLeft) {
-        if (tile.right == newLeft) {
-          newBoard.insert(0, tile);
-          newLeft = tile.left;
-        } else if (tile.left == newLeft) {
-          // Flip tile
-          newBoard.insert(0, DominoTile(id: tile.id, left: tile.right, right: tile.left));
-          newLeft = tile.right;
-        } else {
-          return state;
-        }
+      newBoard.add(actualTile);
+      newLeft = actualTile.left;
+      newRight = actualTile.right;
+    } else if (playOnLeft) {
+      if (actualTile.right == newLeft) {
+        newBoard.insert(0, actualTile);
+        newLeft = actualTile.left;
+      } else if (actualTile.left == newLeft) {
+        newBoard.insert(
+          0,
+          DominoTile(id: actualTile.id, left: actualTile.right, right: actualTile.left),
+        );
+        newLeft = actualTile.right;
       } else {
-        if (tile.left == newRight) {
-          newBoard.add(tile);
-          newRight = tile.right;
-        } else if (tile.right == newRight) {
-          newBoard.add(DominoTile(id: tile.id, left: tile.right, right: tile.left));
-          newRight = tile.left;
-        } else {
-          return state;
-        }
+        return state;
+      }
+    } else {
+      if (actualTile.left == newRight) {
+        newBoard.add(actualTile);
+        newRight = actualTile.right;
+      } else if (actualTile.right == newRight) {
+        newBoard.add(
+          DominoTile(id: actualTile.id, left: actualTile.right, right: actualTile.left),
+        );
+        newRight = actualTile.left;
+      } else {
+        return state;
       }
     }
 
-    final updatedHands = Map<int, List<DominoTile>>.from(state.playerHands);
-    updatedHands[player] = hand.where((t) => t.id != tile.id).toList();
+    final updatedHands = <int, List<DominoTile>>{
+      for (final entry in state.playerHands.entries)
+        entry.key: List<DominoTile>.of(entry.value),
+    };
+    updatedHands[player]!.removeAt(tileIndex);
+    final nextPlayer = _nextPlayer(state, player);
+    if (nextPlayer == null) return state;
 
-    // Check win condition
-    int? winner = updatedHands[player]!.isEmpty ? player : null;
-
-    int nextPlayer = (state.currentTurnPlayer + 1) % state.playerHands.length;
-
+    final winningPlayer = updatedHands[player]!.isEmpty ? player : null;
     return state.copyWith(
       board: newBoard,
       playerHands: updatedHands,
@@ -165,38 +220,83 @@ class DominoEngine {
       leftEnd: newLeft,
       rightEnd: newRight,
       consecutivePasses: 0,
-      winner: winner,
+      winner: winningPlayer,
+      clearWinner: winningPlayer == null,
     );
   }
 
-  static DominoGameState passTurn(DominoGameState state, int player, int totalPlayers) {
-    if (state.currentTurnPlayer != player || hasAnyValidMove(state, player)) {
+  static DominoGameState drawTile(DominoGameState state, int player) {
+    if (state.currentTurnPlayer != player || state.winner != null) return state;
+    final hand = state.playerHands[player];
+    if (hand == null || state.drawPile.isEmpty || hasAnyValidMove(state, player)) {
       return state;
     }
 
-    int newPasses = state.consecutivePasses + 1;
-    int nextPlayer = (state.currentTurnPlayer + 1) % totalPlayers;
+    final updatedHands = <int, List<DominoTile>>{
+      for (final entry in state.playerHands.entries)
+        entry.key: List<DominoTile>.of(entry.value),
+    };
+    updatedHands[player]!.add(state.drawPile.first);
+    return state.copyWith(
+      playerHands: updatedHands,
+      drawPile: state.drawPile.sublist(1),
+      consecutivePasses: 0,
+    );
+  }
 
-    // Check block / deadlock condition
-    int? winner = state.winner;
-    if (newPasses >= totalPlayers) {
-      // Game blocked: determine winner by lowest total pip count
-      int minPips = 999;
-      int lowestPlayer = 0;
-      state.playerHands.forEach((p, hand) {
-        int pips = hand.fold(0, (sum, t) => sum + t.totalValue);
-        if (pips < minPips) {
-          minPips = pips;
-          lowestPlayer = p;
-        }
-      });
-      winner = lowestPlayer;
+  static DominoGameState passTurn(
+    DominoGameState state,
+    int player,
+    int totalPlayers,
+  ) {
+    if (state.winner != null ||
+        state.currentTurnPlayer != player ||
+        totalPlayers != state.playerHands.length ||
+        totalPlayers < 2 ||
+        state.drawPile.isNotEmpty ||
+        hasAnyValidMove(state, player)) {
+      return state;
     }
+
+    final nextPlayer = _nextPlayer(state, player);
+    if (nextPlayer == null) return state;
+    final newPasses = state.consecutivePasses + 1;
+    final winner = newPasses >= totalPlayers ? _lowestPipPlayer(state) : null;
 
     return state.copyWith(
       currentTurnPlayer: nextPlayer,
       consecutivePasses: newPasses,
       winner: winner,
+      clearWinner: winner == null,
     );
+  }
+
+  static int? _nextPlayer(DominoGameState state, int player) {
+    final playerCount = state.playerHands.length;
+    if (playerCount < 2 ||
+        !state.playerHands.keys.toSet().containsAll(List.generate(playerCount, (i) => i))) {
+      return null;
+    }
+    return (player + 1) % playerCount;
+  }
+
+  static int? _lowestPipPlayer(DominoGameState state) {
+    if (state.playerHands.isEmpty) return null;
+    var lowestPlayer = 0;
+    var lowestPips = state.playerHands[0]!.fold<int>(
+      0,
+      (total, tile) => total + tile.totalValue,
+    );
+    for (var player = 1; player < state.playerHands.length; player++) {
+      final pips = state.playerHands[player]!.fold<int>(
+        0,
+        (total, tile) => total + tile.totalValue,
+      );
+      if (pips < lowestPips) {
+        lowestPips = pips;
+        lowestPlayer = player;
+      }
+    }
+    return lowestPlayer;
   }
 }
