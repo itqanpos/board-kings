@@ -223,9 +223,9 @@ class _PlayerPill extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 7),
         decoration: BoxDecoration(
-          color: active ? _playerColors[color].withOpacity(0.17) : panel,
+          color: active ? _playerColors[color]!.withOpacity(0.17) : panel,
           borderRadius: BorderRadius.circular(11),
-          border: Border.all(color: active ? _playerColors[color] : Colors.transparent, width: 1),
+          border: Border.all(color: active ? _playerColors[color]! : Colors.transparent, width: 1),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -305,7 +305,7 @@ class _LudoToken extends StatelessWidget {
               color: _playerColors[piece.color],
               shape: BoxShape.circle,
               border: Border.all(color: highlighted ? Colors.white : const Color(0xFFE9E7E1), width: highlighted ? 2.5 : 1.1),
-              boxShadow: [BoxShadow(color: _playerColors[piece.color].withOpacity(highlighted ? 0.62 : 0.27), blurRadius: highlighted ? 12 : 5, spreadRadius: highlighted ? 1 : 0)],
+              boxShadow: [BoxShadow(color: _playerColors[piece.color]!.withOpacity(highlighted ? 0.62 : 0.27), blurRadius: highlighted ? 12 : 5, spreadRadius: highlighted ? 1 : 0)],
             ),
             child: Center(child: Text('${piece.index + 1}', style: const TextStyle(color: ink, fontSize: 9, fontWeight: FontWeight.w900))),
           ),

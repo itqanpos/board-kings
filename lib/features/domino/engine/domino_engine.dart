@@ -58,7 +58,7 @@ class DominoGameState {
         tiles.add(DominoTile(id: id++, left: left, right: right));
       }
     }
-    (random ?? Random()).shuffle(tiles);
+    tiles.shuffle(random ?? Random());
 
     final tilesPerPlayer = playerCount == 2 ? 7 : 5;
     var tileIndex = 0;
