@@ -42,7 +42,7 @@ class DominoGameState {
     int id = 0;
     for (int i = 0; i <= 6; i++) {
       for (int j = i; j <= 6; j++) {
-        allTiles.Add(DominoTile(id: id++, left: i, right: j));
+        allTiles.add(DominoTile(id: id++, left: i, right: j));
       }
     }
     allTiles.shuffle(Random());
