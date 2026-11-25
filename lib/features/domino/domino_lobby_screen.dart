@@ -25,6 +25,7 @@ class _DominoLobbyScreenState extends State<DominoLobbyScreen> {
               badge: _players == 2 ? 'مقعدان • محلي' : '$_players مقاعد • محلي',
               icon: Icons.extension_rounded,
               accent: aqua,
+              backgroundAsset: 'assets/images/domino_lounge.webp',
             ),
             const SizedBox(height: 22),
             const Text('عدد اللاعبين', style: TextStyle(fontWeight: FontWeight.w800)),

@@ -18,6 +18,7 @@ class LudoLobbyScreen extends StatelessWidget {
               badge: '٤ مقاعد محلية',
               icon: Icons.casino_rounded,
               accent: coral,
+              backgroundAsset: 'assets/images/ludo_lounge.webp',
             ),
             const SizedBox(height: 22),
             const SurfaceCard(

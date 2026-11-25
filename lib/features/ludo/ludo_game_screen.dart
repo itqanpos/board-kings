@@ -316,18 +316,28 @@ class _LudoGameScreenState extends State<LudoGameScreen> {
                                 width: 38,
                                 height: 38,
                                 decoration: BoxDecoration(
-                                  color: _diceFaceColor(_diceSkin.replaceFirst('ludo_dice_', '')),
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      Color.lerp(_diceFaceColor(_diceSkin.replaceFirst('ludo_dice_', '')), Colors.white, 0.26)!,
+                                      _diceFaceColor(_diceSkin.replaceFirst('ludo_dice_', '')),
+                                      Color.lerp(_diceFaceColor(_diceSkin.replaceFirst('ludo_dice_', '')), ink, 0.18)!,
+                                    ],
+                                  ),
                                   borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: _skinAccent(_diceSkin.replaceFirst('ludo_dice_', '')), width: 1.6),
+                                  border: Border.all(color: _skinAccent(_diceSkin.replaceFirst('ludo_dice_', '')).withOpacity(0.95), width: 1.6),
+                                  boxShadow: const [
+                                    BoxShadow(color: Colors.black45, blurRadius: 7, offset: Offset(0, 4)),
+                                    BoxShadow(color: Colors.white24, blurRadius: 1, offset: Offset(-1, -1)),
+                                  ],
                                 ),
                                 child: Center(
                                   child: _game.diceValue == null
                                       ? Icon(Icons.casino_rounded, color: _diceInk(_diceSkin.replaceFirst('ludo_dice_', '')), size: 24)
-                                      : Text(
-                                          '${_game.diceValue}',
-                                          style: TextStyle(color: _diceInk(_diceSkin.replaceFirst('ludo_dice_', '')), fontSize: 20, fontWeight: FontWeight.w900),
-                                        ),
+                                      : _DicePips(value: _game.diceValue!, color: _diceInk(_diceSkin.replaceFirst('ludo_dice_', ''))),
                                 ),
+
                               ),
                             ),
                             const SizedBox(width: 10),
@@ -366,36 +376,117 @@ class _LudoGameScreenState extends State<LudoGameScreen> {
       );
 }
 
+class _DicePips extends StatelessWidget {
+  const _DicePips({required this.value, required this.color});
+
+  static const Map<int, Set<int>> _positions = {
+    1: {4},
+    2: {0, 8},
+    3: {0, 4, 8},
+    4: {0, 2, 6, 8},
+    5: {0, 2, 4, 6, 8},
+    6: {0, 2, 3, 5, 6, 8},
+  };
+
+  final int value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.all(4),
+        child: Column(
+          children: List.generate(3, (row) => Expanded(
+            child: Row(
+              children: List.generate(3, (column) => Expanded(
+                child: Center(
+                  child: _positions[value]!.contains(row * 3 + column)
+                      ? Container(
+                          width: 4.5,
+                          height: 4.5,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                            boxShadow: [BoxShadow(color: color.withOpacity(0.32), blurRadius: 2)],
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              )),
+            ),
+          )),
+        ),
+      );
+}
+
 class _PlayerTurnBar extends StatelessWidget {
   const _PlayerTurnBar({required this.current, required this.message});
   final LudoColor current;
   final String message;
 
   @override
-  Widget build(BuildContext context) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(color: panel, borderRadius: BorderRadius.circular(15)),
-        child: Row(
-          children: [
-            Container(width: 10, height: 34, decoration: BoxDecoration(color: _playerColors[current], borderRadius: BorderRadius.circular(8))),
-            const SizedBox(width: 11),
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
-                child: Text(
-                  message,
-                  key: ValueKey(message),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, color: mutedText),
-                ),
-              ),
-            ),
-          ],
+  Widget build(BuildContext context) {
+    final accent = _playerColors[current]!;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 240),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.centerRight,
+          end: Alignment.centerLeft,
+          colors: [accent.withOpacity(0.18), panel],
         ),
-      );
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(color: accent.withOpacity(0.48)),
+        boxShadow: [BoxShadow(color: accent.withOpacity(0.08), blurRadius: 18)],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: accent.withOpacity(0.18),
+              shape: BoxShape.circle,
+              border: Border.all(color: accent.withOpacity(0.7)),
+            ),
+            child: Icon(Icons.person_rounded, color: accent, size: 23),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text('دور ${_playerNames[current]}', style: TextStyle(color: accent, fontSize: 13, fontWeight: FontWeight.w900)),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(color: accent.withOpacity(0.14), borderRadius: BorderRadius.circular(20)),
+                      child: Text('يلعب الآن', style: TextStyle(color: accent, fontSize: 10, fontWeight: FontWeight.w800)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+                  child: Text(
+                    message,
+                    key: ValueKey(message),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11, color: mutedText),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _PlayerPill extends StatelessWidget {
@@ -405,27 +496,45 @@ class _PlayerPill extends StatelessWidget {
   final int progress;
 
   @override
-  Widget build(BuildContext context) => AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 7),
-        decoration: BoxDecoration(
-          color: active ? _playerColors[color]!.withOpacity(0.17) : panel,
-          borderRadius: BorderRadius.circular(11),
-          border: Border.all(color: active ? _playerColors[color]! : Colors.transparent, width: 1),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(width: 7, height: 7, decoration: BoxDecoration(color: _playerColors[color], shape: BoxShape.circle)),
-            const SizedBox(width: 5),
-            Flexible(child: Text(_playerNames[color]!, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700))),
-            const SizedBox(width: 3),
-            Text('$progress/4', style: const TextStyle(fontSize: 9, color: mutedText)),
-            if (progress == 4) const Icon(Icons.check, size: 12, color: aqua),
-          ],
-        ),
-      );
+  Widget build(BuildContext context) {
+    final accent = _playerColors[color]!;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOut,
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: active
+            ? LinearGradient(colors: [accent.withOpacity(0.2), panel])
+            : null,
+        color: active ? null : panel.withOpacity(0.88),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: active ? accent.withOpacity(0.85) : Colors.white.withOpacity(0.045), width: active ? 1.4 : 1),
+        boxShadow: active ? [BoxShadow(color: accent.withOpacity(0.1), blurRadius: 12)] : null,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(width: 8, height: 8, decoration: BoxDecoration(color: accent, shape: BoxShape.circle, boxShadow: [BoxShadow(color: accent.withOpacity(0.55), blurRadius: 6)])),
+              const SizedBox(width: 5),
+              Flexible(child: Text(_playerNames[color]!, overflow: TextOverflow.ellipsis, style: TextStyle(color: active ? accent : Colors.white, fontSize: 10, fontWeight: FontWeight.w800))),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(progress == 4 ? Icons.emoji_events_rounded : Icons.flag_rounded, size: 11, color: progress == 4 ? gold : mutedText),
+              const SizedBox(width: 3),
+              Text('$progress من 4', style: TextStyle(fontSize: 10, color: active ? Colors.white : mutedText, fontWeight: FontWeight.w700)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _LudoBoard extends StatelessWidget {
@@ -440,9 +549,13 @@ class _LudoBoard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: panel,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _skinAccent(tableSkin.replaceFirst('ludo_table_', '')).withOpacity(0.75), width: 2),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF293A50), panel, Color(0xFF121D2C)],
+        ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: _skinAccent(tableSkin.replaceFirst('ludo_table_', '')).withOpacity(0.8), width: 2),
         boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 22, offset: Offset(0, 9))],
       ),
       child: ClipRRect(
@@ -575,13 +688,24 @@ class _LudoToken extends StatelessWidget {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
             decoration: BoxDecoration(
-              color: _playerColors[piece.color],
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color.lerp(_playerColors[piece.color]!, Colors.white, 0.46)!,
+                  _playerColors[piece.color]!,
+                  Color.lerp(_playerColors[piece.color]!, ink, 0.38)!,
+                ],
+              ),
               shape: BoxShape.circle,
               border: Border.all(
                 color: highlighted ? Colors.white : _skinAccent(appearanceStyle),
                 width: highlighted ? 2.5 : appearanceStyle == 'classic' ? 1.1 : 2,
               ),
-              boxShadow: [BoxShadow(color: _playerColors[piece.color]!.withOpacity(highlighted ? 0.62 : 0.27), blurRadius: highlighted ? 12 : 5, spreadRadius: highlighted ? 1 : 0)],
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.52), blurRadius: highlighted ? 9 : 5, offset: const Offset(0, 3)),
+                BoxShadow(color: _playerColors[piece.color]!.withOpacity(highlighted ? 0.7 : 0.32), blurRadius: highlighted ? 12 : 6, spreadRadius: highlighted ? 1 : 0),
+              ],
             ),
             child: Center(child: Text('${piece.index + 1}', style: const TextStyle(color: ink, fontSize: 9, fontWeight: FontWeight.w900))),
           ),

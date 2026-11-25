@@ -24,6 +24,7 @@ class RoomsScreen extends StatelessWidget {
               subtitle: 'أربعة مقاعد • لعب محلي على جهاز واحد',
               icon: Icons.casino_rounded,
               accent: coral,
+              artwork: 'assets/images/ludo_lounge.webp',
               onTap: () => context.push('/ludo-lobby'),
             ),
             const SizedBox(height: 12),
@@ -32,6 +33,7 @@ class RoomsScreen extends StatelessWidget {
               subtitle: 'من مقعدين إلى أربعة • إعداد محلي',
               icon: Icons.extension_rounded,
               accent: aqua,
+              artwork: 'assets/images/domino_lounge.webp',
               onTap: () => context.push('/domino-lobby'),
             ),
             const SizedBox(height: 18),
@@ -61,6 +63,7 @@ class _LocalTableCard extends StatelessWidget {
     required this.subtitle,
     required this.icon,
     required this.accent,
+    required this.artwork,
     required this.onTap,
   });
 
@@ -68,6 +71,7 @@ class _LocalTableCard extends StatelessWidget {
   final String subtitle;
   final IconData icon;
   final Color accent;
+  final String artwork;
   final VoidCallback onTap;
 
   @override
@@ -80,13 +84,19 @@ class _LocalTableCard extends StatelessWidget {
           child: Ink(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topRight,
-                end: Alignment.bottomLeft,
-                colors: [accent.withOpacity(0.16), panel],
+              image: DecorationImage(
+                image: AssetImage(artwork),
+                fit: BoxFit.cover,
+                colorFilter: ColorFilter.mode(ink.withOpacity(0.62), BlendMode.darken),
               ),
-              border: Border.all(color: accent.withOpacity(0.22)),
+              gradient: LinearGradient(
+                begin: Alignment.centerRight,
+                end: Alignment.centerLeft,
+                colors: [ink.withOpacity(0.94), ink.withOpacity(0.74), ink.withOpacity(0.24)],
+              ),
+              border: Border.all(color: accent.withOpacity(0.4)),
               borderRadius: BorderRadius.circular(23),
+              boxShadow: [BoxShadow(color: accent.withOpacity(0.08), blurRadius: 18, offset: const Offset(0, 6))],
             ),
             child: Row(
               children: [

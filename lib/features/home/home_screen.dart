@@ -55,6 +55,7 @@ class HomeScreen extends StatelessWidget {
                       icon: Icons.casino_rounded,
                       accent: coral,
                       badge: '٤ لاعبين محلياً',
+                      artwork: 'assets/images/ludo_lounge.webp',
                       onTap: () => context.push('/ludo-lobby'),
                     ),
                     const SizedBox(height: 12),
@@ -64,6 +65,7 @@ class HomeScreen extends StatelessWidget {
                       icon: Icons.extension_rounded,
                       accent: aqua,
                       badge: '٢–٤ لاعبين محلياً',
+                      artwork: 'assets/images/domino_lounge.webp',
                       onTap: () => context.push('/domino-lobby'),
                     ),
                     const SizedBox(height: 28),
@@ -164,56 +166,87 @@ class _PlayerSummary extends StatelessWidget {
 }
 
 class _GameCard extends StatelessWidget {
-  const _GameCard({required this.title, required this.subtitle, required this.icon, required this.accent, required this.badge, required this.onTap});
+  const _GameCard({required this.title, required this.subtitle, required this.icon, required this.accent, required this.badge, required this.artwork, required this.onTap});
 
   final String title;
   final String subtitle;
   final IconData icon;
   final Color accent;
   final String badge;
+  final String artwork;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => SurfaceCard(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(color: accent.withOpacity(0.15), borderRadius: BorderRadius.circular(17)),
-                  child: Icon(icon, color: accent, size: 27),
-                ),
-                const SizedBox(width: 13),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+  Widget build(BuildContext context) => Material(
+        color: panel,
+        borderRadius: BorderRadius.circular(24),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: accent.withOpacity(0.48)),
+            boxShadow: [BoxShadow(color: accent.withOpacity(0.08), blurRadius: 20, offset: const Offset(0, 7))],
+            image: DecorationImage(
+              image: AssetImage(artwork),
+              fit: BoxFit.cover,
+              colorFilter: ColorFilter.mode(ink.withOpacity(0.48), BlendMode.darken),
+            ),
+            gradient: LinearGradient(
+              begin: Alignment.centerRight,
+              end: Alignment.centerLeft,
+              colors: [ink.withOpacity(0.97), ink.withOpacity(0.82), ink.withOpacity(0.3)],
+            ),
+          ),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(24),
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Text(title, style: Theme.of(context).textTheme.titleLarge),
-                      const SizedBox(height: 4),
-                      Text(badge, style: const TextStyle(color: mutedText, fontSize: 12)),
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(colors: [accent.withOpacity(0.35), panel]),
+                          borderRadius: BorderRadius.circular(17),
+                          border: Border.all(color: accent.withOpacity(0.8)),
+                          boxShadow: [BoxShadow(color: accent.withOpacity(0.2), blurRadius: 13)],
+                        ),
+                        child: Icon(icon, color: accent, size: 27),
+                      ),
+                      const SizedBox(width: 13),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(title, style: Theme.of(context).textTheme.titleLarge),
+                            const SizedBox(height: 4),
+                            Text(badge, style: const TextStyle(color: Color(0xFFE0E5ED), fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.arrow_outward_rounded, color: accent, size: 20),
                     ],
                   ),
-                ),
-                Icon(Icons.arrow_outward_rounded, color: accent, size: 20),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Text(subtitle, style: const TextStyle(color: mutedText)),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: onTap,
-                icon: const Icon(Icons.play_arrow_rounded),
-                label: const Text('العب الآن'),
-                style: ElevatedButton.styleFrom(backgroundColor: accent, foregroundColor: ink),
+                  const SizedBox(height: 14),
+                  Text(subtitle, style: const TextStyle(color: Color(0xFFE0E5ED))),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: onTap,
+                      icon: const Icon(Icons.play_arrow_rounded),
+                      label: const Text('العب الآن'),
+                      style: ElevatedButton.styleFrom(backgroundColor: accent, foregroundColor: ink),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       );
 }
