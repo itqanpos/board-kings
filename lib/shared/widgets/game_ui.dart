@@ -112,7 +112,12 @@ class GameScaffold extends StatelessWidget {
         child: scrollable
             ? SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
-                child: child,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 720),
+                    child: child,
+                  ),
+                ),
               )
             : Padding(
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
@@ -134,9 +139,14 @@ class SurfaceCard extends StatelessWidget {
         width: double.infinity,
         padding: padding,
         decoration: BoxDecoration(
-          color: panel,
+          gradient: const LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [Color(0xFF202E43), panel],
+          ),
           borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: Colors.white.withOpacity(0.055)),
+          border: Border.all(color: Colors.white.withOpacity(0.07)),
+          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 16, offset: Offset(0, 7))],
         ),
         child: child,
       );

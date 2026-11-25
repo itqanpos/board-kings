@@ -11,6 +11,13 @@ import '../store/data/cosmetic_repository.dart';
 import 'engine/domino_ai.dart';
 import 'engine/domino_engine.dart';
 
+const List<Color> _seatColors = [
+  aqua,
+  coral,
+  gold,
+  Color(0xFF9B8BFF),
+];
+
 class DominoGameScreen extends StatefulWidget {
   const DominoGameScreen({super.key, required this.playerCount});
 
@@ -257,14 +264,36 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
                   children: List.generate(widget.playerCount, (index) {
                     final hand = _game.playerHands[index] ?? const <DominoTile>[];
                     final pips = hand.fold<int>(0, (sum, tile) => sum + tile.totalValue);
+                    final accent = _seatColors[index % _seatColors.length];
+                    final active = index == _player;
                     return Expanded(
                       child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
+                        duration: const Duration(milliseconds: 220),
                         curve: Curves.easeOut,
                         margin: const EdgeInsets.symmetric(horizontal: 3),
-                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                        decoration: BoxDecoration(color: index == _player ? aqua.withOpacity(0.14) : panel, borderRadius: BorderRadius.circular(12), border: Border.all(color: index == _player ? aqua : Colors.transparent)),
-                        child: Column(children: [Text('لاعب ${index + 1}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)), const SizedBox(height: 3), Text('${hand.length} قطع • $pips نقطة', style: const TextStyle(color: mutedText, fontSize: 9))]),
+                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 3),
+                        decoration: BoxDecoration(
+                          gradient: active ? LinearGradient(colors: [accent.withOpacity(0.2), panel]) : null,
+                          color: active ? null : panel,
+                          borderRadius: BorderRadius.circular(15),
+                          border: Border.all(color: active ? accent.withOpacity(0.8) : Colors.white.withOpacity(0.05), width: active ? 1.3 : 1),
+                          boxShadow: active ? [BoxShadow(color: accent.withOpacity(0.1), blurRadius: 12)] : null,
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(width: 7, height: 7, decoration: BoxDecoration(color: accent, shape: BoxShape.circle)),
+                                const SizedBox(width: 4),
+                                Flexible(child: Text('لاعب ${index + 1}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: active ? accent : Colors.white, fontSize: 10, fontWeight: FontWeight.w900))),
+                              ],
+                            ),
+                            const SizedBox(height: 5),
+                            Text('${hand.length} قطع • $pips نقطة', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: mutedText, fontSize: 9.5)),
+                          ],
+                        ),
                       ),
                     );
                   }),
@@ -275,12 +304,35 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
                   child: Container(
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      color: _tableFill(_tableSkin),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: _skinAccent(_tableSkin.replaceFirst('domino_table_', '')).withOpacity(0.65), width: 2),
+                      gradient: LinearGradient(
+                        begin: Alignment.topRight,
+                        end: Alignment.bottomLeft,
+                        colors: [
+                          _tableFill(_tableSkin),
+                          Color.lerp(_tableFill(_tableSkin), ink, 0.3)!,
+                          _tableFill(_tableSkin),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: _skinAccent(_tableSkin.replaceFirst('domino_table_', '')).withOpacity(0.8), width: 2),
+                      boxShadow: [BoxShadow(color: _skinAccent(_tableSkin.replaceFirst('domino_table_', '')).withOpacity(0.08), blurRadius: 20, offset: const Offset(0, 8))],
                     ),
                     child: _game.board.isEmpty
-                        ? const Center(child: Text('ضع القطعة الافتتاحية هنا', style: TextStyle(color: mutedText)))
+                        ? Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 62,
+                                height: 62,
+                                decoration: BoxDecoration(color: Colors.white.withOpacity(0.07), shape: BoxShape.circle, border: Border.all(color: Colors.white.withOpacity(0.1))),
+                                child: const Icon(Icons.extension_rounded, color: Colors.white70, size: 29),
+                              ),
+                              const SizedBox(height: 12),
+                              const Text('الطاولة جاهزة', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                              const SizedBox(height: 5),
+                              const Text('ضع القطعة الافتتاحية لبدء السلسلة', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                            ],
+                          )
                         : SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
                             reverse: false,
@@ -361,32 +413,56 @@ class _TurnSummary extends StatelessWidget {
   final int stock;
 
   @override
-  Widget build(BuildContext context) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
-        decoration: BoxDecoration(color: panel, borderRadius: BorderRadius.circular(14)),
-        child: Row(
-          children: [
-            const Icon(Icons.person_pin_circle_outlined, color: aqua),
-            const SizedBox(width: 8),
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
-                child: Text(
-                  'الدور للاعب ${player + 1}  •  $message',
-                  key: ValueKey(message),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 11, color: mutedText),
+  Widget build(BuildContext context) {
+    final accent = _seatColors[player % _seatColors.length];
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(begin: Alignment.centerRight, end: Alignment.centerLeft, colors: [accent.withOpacity(0.2), panel]),
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(color: accent.withOpacity(0.5)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(color: accent.withOpacity(0.17), shape: BoxShape.circle, border: Border.all(color: accent.withOpacity(0.6))),
+            child: Icon(Icons.person_rounded, color: accent, size: 20),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text('دور اللاعب ${player + 1}', style: TextStyle(color: accent, fontSize: 12, fontWeight: FontWeight.w900)),
+                    const SizedBox(width: 7),
+                    Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: accent.withOpacity(0.14), borderRadius: BorderRadius.circular(20)), child: Text('يلعب الآن', style: TextStyle(color: accent, fontSize: 9, fontWeight: FontWeight.w800))),
+                  ],
                 ),
-              ),
+                const SizedBox(height: 3),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+                  child: Text(message, key: ValueKey(message), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, color: mutedText)),
+                ),
+              ],
             ),
-            const SizedBox(width: 6),
-            Text('المخزون $stock', style: const TextStyle(fontSize: 10, color: aqua, fontWeight: FontWeight.w800)),
-          ],
-        ),
-      );
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+            decoration: BoxDecoration(color: panelRaised, borderRadius: BorderRadius.circular(12)),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.inventory_2_outlined, color: aqua, size: 14), const SizedBox(height: 2), Text('$stock', style: const TextStyle(color: aqua, fontSize: 10, fontWeight: FontWeight.w900))]),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class DominoTileFace extends StatelessWidget {
@@ -436,34 +512,29 @@ class DominoTileFace extends StatelessWidget {
                 height: height,
                 padding: const EdgeInsets.all(5),
                 decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [faceColor, Color.lerp(faceColor, ink, darkFace ? 0.1 : 0.06)!],
+                  ),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: strokeColor, width: selected ? 2 : 1.5),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 7, offset: const Offset(0, 3)),
+                    if (selected) BoxShadow(color: coral.withOpacity(0.28), blurRadius: 14),
+                  ],
                 ),
                 child: Column(
                   children: [
                     Expanded(
                       child: Center(
-                        child: Text(
-                          '${tile.left}',
-                          style: TextStyle(
-                            color: numberColor,
-                            fontSize: compact ? 16 : 20,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
+                        child: _DominoPipFace(value: tile.left, color: numberColor, dotSize: compact ? 4 : 6),
                       ),
                     ),
                     Container(height: 1, color: const Color(0xFFBDB5A5)),
                     Expanded(
                       child: Center(
-                        child: Text(
-                          '${tile.right}',
-                          style: TextStyle(
-                            color: numberColor,
-                            fontSize: compact ? 16 : 20,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
+                        child: _DominoPipFace(value: tile.right, color: numberColor, dotSize: compact ? 4 : 6),
                       ),
                     ),
                   ],
@@ -472,6 +543,53 @@ class DominoTileFace extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _DominoPipFace extends StatelessWidget {
+  const _DominoPipFace({required this.value, required this.color, required this.dotSize});
+
+  static const Map<int, Set<int>> _pipPositions = {
+    0: <int>{},
+    1: <int>{4},
+    2: <int>{0, 8},
+    3: <int>{0, 4, 8},
+    4: <int>{0, 2, 6, 8},
+    5: <int>{0, 2, 4, 6, 8},
+    6: <int>{0, 2, 3, 5, 6, 8},
+  };
+
+  final int value;
+  final Color color;
+  final double dotSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final positions = _pipPositions[value] ?? const <int>{};
+    return SizedBox(
+      width: dotSize * 4.5,
+      height: dotSize * 4.5,
+      child: Column(
+        children: List.generate(3, (row) => Expanded(
+          child: Row(
+            children: List.generate(3, (column) {
+              final visible = positions.contains(row * 3 + column);
+              return Expanded(
+                child: Center(
+                  child: visible
+                      ? Container(
+                          width: dotSize,
+                          height: dotSize,
+                          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              );
+            }),
+          ),
+        )),
       ),
     );
   }
