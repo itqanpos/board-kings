@@ -149,7 +149,32 @@ class _DiceIcon extends StatelessWidget {
       decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color.lerp(face, Colors.white, 0.18)!, face, Color.lerp(face, Colors.black, 0.12)!]), borderRadius: BorderRadius.circular(9), border: Border.all(color: ludoGold, width: 1.4), boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 5, offset: Offset(0, 2))]),
       child: value == null
           ? Icon(Icons.casino_rounded, size: 23, color: pip)
-          : Column(children: List.generate(3, (row) => Expanded(child: Row(children: List.generate(3, (column) => Expanded(child: Center(child: _pips[value]!.contains(row * 3 + column) ? Container(width: 4.5, height: 4.5, decoration: BoxDecoration(color: pip, shape: BoxShape.circle)) : const SizedBox.shrink())))))),
+          : Column(
+              children: List.generate(
+                3,
+                (row) => Expanded(
+                  child: Row(
+                    children: List.generate(
+                      3,
+                      (column) => Expanded(
+                        child: Center(
+                          child: _pips[value]!.contains(row * 3 + column)
+                              ? Container(
+                                  width: 4.5,
+                                  height: 4.5,
+                                  decoration: BoxDecoration(
+                                    color: pip,
+                                    shape: BoxShape.circle,
+                                  ),
+                                )
+                              : const SizedBox.shrink(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
     );
   }
 }

@@ -117,10 +117,10 @@ class LudoPremiumBoardPainter extends CustomPainter {
     }
 
     final lanes = <LudoColor, List<Offset>>{
-      LudoColor.red: [for (var x = 1; x <= 6; x++) Offset(x, 7)],
-      LudoColor.green: [for (var y = 1; y <= 6; y++) Offset(7, y)],
-      LudoColor.yellow: [for (var x = 13; x >= 8; x--) Offset(x, 7)],
-      LudoColor.blue: [for (var y = 13; y >= 8; y--) Offset(7, y)],
+      LudoColor.red: [for (var x = 1; x <= 6; x++) Offset(x.toDouble(), 7)],
+      LudoColor.green: [for (var y = 1; y <= 6; y++) Offset(7, y.toDouble())],
+      LudoColor.yellow: [for (var x = 13; x >= 8; x--) Offset(x.toDouble(), 7)],
+      LudoColor.blue: [for (var y = 13; y >= 8; y--) Offset(7, y.toDouble())],
     };
     for (final entry in lanes.entries) {
       for (final point in entry.value) {
