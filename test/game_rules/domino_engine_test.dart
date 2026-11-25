@@ -187,6 +187,41 @@ void main() {
       expect(DominoEngine.playTile(won, 1, tile(8, 3, 3), false), same(won));
     });
 
+    test('rejects actions from non-active players on an open board', () {
+      final game = stateWith(
+        board: [tile(100, 2, 5)],
+        hands: {
+          0: [tile(1, 2, 3)],
+          1: [tile(2, 5, 6)],
+        },
+        currentPlayer: 0,
+        leftEnd: 2,
+        rightEnd: 5,
+      );
+      expect(DominoEngine.hasAnyValidMove(game, 1), isFalse);
+      expect(DominoEngine.playTile(game, 1, game.playerHands[1]!.single, true), same(game));
+    });
+
+    test('rejects inconsistent endpoints and duplicate tile ids', () {
+      final inconsistent = stateWith(
+        board: [tile(100, 2, 5)],
+        hands: {0: [tile(1, 2, 3)], 1: [tile(2, 5, 6)]},
+        currentPlayer: 0,
+        leftEnd: 1,
+        rightEnd: 5,
+      );
+      expect(DominoEngine.playTile(inconsistent, 0, tile(1, 2, 3), true), same(inconsistent));
+
+      final duplicateIds = stateWith(
+        board: [tile(100, 2, 5)],
+        hands: {0: [tile(100, 1, 3)], 1: [tile(2, 5, 6)]},
+        currentPlayer: 0,
+        leftEnd: 2,
+        rightEnd: 5,
+      );
+      expect(DominoEngine.playTile(duplicateIds, 0, tile(100, 1, 3), true), same(duplicateIds));
+    });
+
     test('reports legal moves only when the player has a playable tile', () {
       final game = stateWith(
         board: [tile(100, 2, 5)],

@@ -132,7 +132,42 @@ class DominoGameState {
 }
 
 class DominoEngine {
+  static bool _hasValidState(DominoGameState state) {
+    final count = state.playerHands.length;
+    if (count < 2 ||
+        !state.playerHands.keys
+            .toSet()
+            .containsAll(List.generate(count, (index) => index)) ||
+        state.currentTurnPlayer < 0 ||
+        state.currentTurnPlayer >= count) {
+      return false;
+    }
+    if (state.board.isEmpty) {
+      if (state.leftEnd != null || state.rightEnd != null) return false;
+    } else if (state.leftEnd != state.board.first.left ||
+        state.rightEnd != state.board.last.right) {
+      return false;
+    }
+
+    final ids = <int>{};
+    for (final tile in [
+      ...state.board,
+      ...state.playerHands.values.expand((hand) => hand),
+      ...state.drawPile,
+    ]) {
+      if (tile.left < 0 || tile.left > 6 || tile.right < 0 || tile.right > 6 ||
+          !ids.add(tile.id)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   static bool canPlayTile(DominoGameState state, DominoTile tile) {
+    if (!_hasValidState(state) ||
+        tile.left < 0 || tile.left > 6 || tile.right < 0 || tile.right > 6) {
+      return false;
+    }
     if (state.board.isEmpty) return true;
     return tile.left == state.leftEnd ||
         tile.right == state.leftEnd ||
@@ -141,11 +176,16 @@ class DominoEngine {
   }
 
   static bool hasAnyValidMove(DominoGameState state, int player) {
+    if (!_hasValidState(state) ||
+        player != state.currentTurnPlayer ||
+        state.winner != null) {
+      return false;
+    }
     final hand = state.playerHands[player];
-    if (hand == null || hand.isEmpty || state.winner != null) return false;
+    if (hand == null || hand.isEmpty) return false;
     if (state.board.isEmpty) {
-      return player == state.currentTurnPlayer &&
-          (state.openingTileId == null || hand.any((tile) => tile.id == state.openingTileId));
+      return state.openingTileId == null ||
+          hand.any((tile) => tile.id == state.openingTileId);
     }
     return hand.any((tile) => canPlayTile(state, tile));
   }
@@ -156,7 +196,11 @@ class DominoEngine {
     DominoTile tile,
     bool playOnLeft,
   ) {
-    if (state.currentTurnPlayer != player || state.winner != null) return state;
+    if (!_hasValidState(state) ||
+        state.currentTurnPlayer != player ||
+        state.winner != null) {
+      return state;
+    }
     final hand = state.playerHands[player];
     if (hand == null) return state;
 
@@ -226,7 +270,11 @@ class DominoEngine {
   }
 
   static DominoGameState drawTile(DominoGameState state, int player) {
-    if (state.currentTurnPlayer != player || state.winner != null) return state;
+    if (!_hasValidState(state) ||
+        state.currentTurnPlayer != player ||
+        state.winner != null) {
+      return state;
+    }
     final hand = state.playerHands[player];
     if (hand == null || state.drawPile.isEmpty || hasAnyValidMove(state, player)) {
       return state;
@@ -249,7 +297,8 @@ class DominoEngine {
     int player,
     int totalPlayers,
   ) {
-    if (state.winner != null ||
+    if (!_hasValidState(state) ||
+        state.winner != null ||
         state.currentTurnPlayer != player ||
         totalPlayers != state.playerHands.length ||
         totalPlayers < 2 ||

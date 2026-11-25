@@ -90,9 +90,7 @@ class LudoEngine {
     LudoColor.blue: 39,
   };
 
-  static final Random _random = Random.secure();
-
-  static int rollDice() => _random.nextInt(6) + 1;
+  static int rollDice({Random? random}) => (random ?? Random.secure()).nextInt(6) + 1;
 
   /// Records a resolved die value. A third consecutive six forfeits that roll.
   static LudoGameState recordRoll(LudoGameState state, int value) {
@@ -134,9 +132,21 @@ class LudoEngine {
     final piece = pieces[pieceIndex];
     if (piece.color != color) return false;
     final position = piece.position;
-    if (position == -1) return dice == 6;
-    if (position < 0 || position >= finishPosition) return false;
-    return position + dice <= finishPosition;
+    if (position == -1) {
+      if (dice != 6) return false;
+      return !_isBlockedByOpponent(state, color, 0);
+    }
+    if (position < 0 || position >= finishPosition || position + dice > finishPosition) {
+      return false;
+    }
+
+    // A pair of opposing pieces is a blockade: pieces cannot land on it or
+    // cross it. Home-lane progress is private and never intersects the track.
+    final trackSteps = dice < trackLength - position ? dice : trackLength - position;
+    for (var step = 1; step <= trackSteps; step++) {
+      if (_isBlockedByOpponent(state, color, position + step)) return false;
+    }
+    return true;
   }
 
   static LudoGameState applyMove(
@@ -167,14 +177,21 @@ class LudoEngine {
         for (final entry in updatedPieces.entries) {
           if (entry.key == color) continue;
           final opponentPieces = entry.value;
+          final occupants = <int>[];
           for (var index = 0; index < opponentPieces.length; index++) {
             final opponent = opponentPieces[index];
             if (opponent.position >= 0 &&
                 opponent.position < trackLength &&
                 _absoluteSquare(entry.key, opponent.position) == absoluteSquare) {
-              opponentPieces[index] = opponent.copyWith(position: -1);
-              captured = true;
+              occupants.add(index);
             }
+          }
+          // Single opposing pieces are captured; pairs are protected
+          // blockades and are rejected by isValidMove before this point.
+          if (occupants.length == 1) {
+            opponentPieces[occupants.single] =
+                opponentPieces[occupants.single].copyWith(position: -1);
+            captured = true;
           }
         }
       }
@@ -209,6 +226,28 @@ class LudoEngine {
       clearDiceValue: true,
       consecutiveSixes: dice == 6 ? state.consecutiveSixes : 0,
     );
+  }
+
+  static bool _isBlockedByOpponent(
+    LudoGameState state,
+    LudoColor movingColor,
+    int progress,
+  ) {
+    if (progress < 0 || progress >= trackLength) return false;
+    final target = _absoluteSquare(movingColor, progress);
+    for (final entry in state.pieces.entries) {
+      if (entry.key == movingColor) continue;
+      var occupants = 0;
+      for (final piece in entry.value) {
+        if (piece.position >= 0 &&
+            piece.position < trackLength &&
+            _absoluteSquare(entry.key, piece.position) == target) {
+          occupants++;
+          if (occupants == 2) return true;
+        }
+      }
+    }
+    return false;
   }
 
   static int _absoluteSquare(LudoColor color, int progress) =>

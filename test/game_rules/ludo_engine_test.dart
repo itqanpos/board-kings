@@ -180,5 +180,30 @@ void main() {
       expect(cleared.diceValue, isNull);
       expect(cleared.winner, isNull);
     });
+
+    test('uses an injectable seeded random source for reproducible dice', () {
+      final firstRoll = LudoEngine.rollDice(random: Random(42));
+      expect(LudoEngine.rollDice(random: Random(42)), firstRoll);
+      for (var seed = 0; seed < 100; seed++) {
+        expect(LudoEngine.rollDice(random: Random(seed)), inInclusiveRange(1, 6));
+      }
+    });
+
+    test('cannot land on or cross an opponent blockade', () {
+      final state = stateWith(positions: {
+        LudoColor.red: {0: 3},
+        LudoColor.green: {0: 44, 1: 44},
+      });
+      final rolledTwo = LudoEngine.recordRoll(state, 2);
+      expect(LudoEngine.isValidMove(rolledTwo, LudoColor.red, 'red_0', 2), isFalse);
+
+      final rolledThree = LudoEngine.recordRoll(state, 3);
+      expect(LudoEngine.isValidMove(rolledThree, LudoColor.red, 'red_0', 3), isFalse);
+      expect(
+        LudoEngine.applyMove(rolledThree, LudoColor.red, 'red_0', 3),
+        same(rolledThree),
+      );
+      expect(state.pieces[LudoColor.green]!.where((piece) => piece.position == 44), hasLength(2));
+    });
   });
 }
