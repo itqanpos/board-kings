@@ -1,4 +1,5 @@
 import 'package:board_kings/features/ludo/engine/ludo_engine.dart';
+import 'package:board_kings/ludo_engine.dart' as board;
 import 'package:flutter_test/flutter_test.dart';
 
 LudoGameState stateWith({
@@ -29,6 +30,66 @@ LudoGameState stateWith({
 }
 
 void main() {
+  group('Ludo board coordinates', () {
+    test('maps relative progress to the correct color-specific track square', () {
+      expect(board.LudoEngine.getAbsoluteTrackPosition('red', 0), 0);
+      expect(board.LudoEngine.getAbsoluteTrackPosition('green', 0), 13);
+      expect(board.LudoEngine.getAbsoluteTrackPosition('yellow', 0), 26);
+      expect(board.LudoEngine.getAbsoluteTrackPosition('blue', 0), 39);
+      expect(board.LudoEngine.getAbsoluteTrackPosition('green', 39), 0);
+      expect(board.LudoEngine.getAbsoluteTrackPosition('red', -1), isNull);
+      expect(board.LudoEngine.getAbsoluteTrackPosition('red', 52), isNull);
+
+      expect(board.LudoEngine.getTokenCoords('red', 0, 0), [6.0, 13.0]);
+      expect(board.LudoEngine.getTokenCoords('green', 0, 0), [1.0, 6.0]);
+      expect(board.LudoEngine.getTokenCoords('yellow', 0, 0), [8.0, 1.0]);
+      expect(board.LudoEngine.getTokenCoords('blue', 0, 0), [13.0, 8.0]);
+    });
+
+    test('gives every piece in a shared track square its own visual position', () {
+      final positions = [
+        for (var index = 0; index < 4; index++)
+          board.LudoEngine.getTokenCoords(
+            'red',
+            0,
+            index,
+            stackIndex: index,
+            stackSize: 4,
+          ),
+      ];
+
+      expect(positions.toSet(), hasLength(4));
+      expect(
+        positions.any((point) => point[0] == 6.0 && point[1] == 13.0),
+        isFalse,
+      );
+      expect(board.LudoEngine.getTokenCoords('red', -1, 0), [1.5, 1.5]);
+      expect(board.LudoEngine.getTokenCoords('red', 0, 0), [6.0, 13.0]);
+    });
+
+    test('offsets mixed-color pieces sharing one absolute square without changing progress', () {
+      final redPoint = board.LudoEngine.getTokenCoords(
+        'red',
+        0,
+        0,
+        stackIndex: 0,
+        stackSize: 2,
+      );
+      final greenPoint = board.LudoEngine.getTokenCoords(
+        'green',
+        39,
+        0,
+        stackIndex: 1,
+        stackSize: 2,
+      );
+
+      expect(board.LudoEngine.getAbsoluteTrackPosition('red', 0), 0);
+      expect(board.LudoEngine.getAbsoluteTrackPosition('green', 39), 0);
+      expect(redPoint, isNot(greenPoint));
+      expect(redPoint[1], greenPoint[1]);
+    });
+  });
+
   group('Ludo turn and roll validation', () {
     test('creates four colors with four base pieces each', () {
       final game = LudoGameState.initial();
@@ -126,17 +187,31 @@ void main() {
       expect(LudoEngine.recordRoll(finished, 6), same(finished));
     });
 
-    test('captures opponents occupying the same absolute track square', () {
+    test('captures an opponent and allows that piece to re-enter from base', () {
       final state = stateWith(positions: {
         LudoColor.red: {0: 4},
         LudoColor.green: {0: 44},
       });
       final rolled = LudoEngine.recordRoll(state, 1);
-      final moved = LudoEngine.applyMove(rolled, LudoColor.red, 'red_0', 1);
+      final captured = LudoEngine.applyMove(rolled, LudoColor.red, 'red_0', 1);
 
-      expect(moved.pieces[LudoColor.red]![0].position, 5);
-      expect(moved.pieces[LudoColor.green]![0].position, -1);
-      expect(moved.currentTurn, LudoColor.red);
+      expect(captured.pieces[LudoColor.red]![0].position, 5);
+      expect(captured.pieces[LudoColor.green]![0].position, -1);
+      expect(captured.currentTurn, LudoColor.red);
+
+      final greenTurn = captured.copyWith(currentTurn: LudoColor.green);
+      final reentryRoll = LudoEngine.recordRoll(greenTurn, 6);
+      final reentered = LudoEngine.applyMove(
+        reentryRoll,
+        LudoColor.green,
+        'green_0',
+        6,
+      );
+      expect(reentered.pieces[LudoColor.green]![0].position, 0);
+      expect(
+        board.LudoEngine.getTokenCoords('green', 0, 0),
+        [1.0, 6.0],
+      );
     });
 
     test('does not capture a piece on an absolute safe square', () {

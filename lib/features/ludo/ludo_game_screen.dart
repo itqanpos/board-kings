@@ -368,12 +368,19 @@ class _LudoBoard extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final cell = constraints.maxWidth / 15;
+            final pieces = game.pieces.values.expand((playerPieces) => playerPieces).toList();
             return Stack(
               children: [
                 Positioned.fill(child: CustomPaint(painter: AAAProLudoBoardPainter())),
-                for (final pieces in game.pieces.values)
-                  for (final piece in pieces)
-                    _LudoToken(piece: piece, cell: cell, highlighted: legalPieceIds.contains(piece.id), onTap: () => onPieceTap(piece)),
+                for (final piece in pieces)
+                  _LudoToken(
+                    piece: piece,
+                    cell: cell,
+                    highlighted: legalPieceIds.contains(piece.id),
+                    onTap: () => onPieceTap(piece),
+                    stackIndex: _stackIndex(piece, pieces),
+                    stackSize: _piecesAtSameVisualSquare(piece, pieces).length,
+                  ),
               ],
             );
           },
@@ -383,17 +390,63 @@ class _LudoBoard extends StatelessWidget {
   }
 }
 
+List<LudoPiece> _piecesAtSameVisualSquare(LudoPiece piece, List<LudoPiece> pieces) {
+  final matching = pieces.where((candidate) {
+    if (piece.position == -1 || candidate.position == -1) {
+      return piece.id == candidate.id;
+    }
+    if (piece.position < board.LudoEngine.trackLength &&
+        candidate.position < board.LudoEngine.trackLength) {
+      return board.LudoEngine.getAbsoluteTrackPosition(
+            piece.color.name,
+            piece.position,
+          ) ==
+          board.LudoEngine.getAbsoluteTrackPosition(
+            candidate.color.name,
+            candidate.position,
+          );
+    }
+    if (piece.position == 58 || candidate.position == 58) {
+      return piece.position == 58 && candidate.position == 58;
+    }
+    return piece.color == candidate.color && piece.position == candidate.position;
+  }).toList()
+    ..sort((a, b) {
+      final colorOrder = a.color.index.compareTo(b.color.index);
+      return colorOrder != 0 ? colorOrder : a.index.compareTo(b.index);
+    });
+  return matching;
+}
+
+int _stackIndex(LudoPiece piece, List<LudoPiece> pieces) =>
+    _piecesAtSameVisualSquare(piece, pieces).indexWhere((candidate) => candidate.id == piece.id);
+
 class _LudoToken extends StatelessWidget {
-  const _LudoToken({required this.piece, required this.cell, required this.highlighted, required this.onTap});
+  const _LudoToken({
+    required this.piece,
+    required this.cell,
+    required this.highlighted,
+    required this.onTap,
+    required this.stackIndex,
+    required this.stackSize,
+  });
   final LudoPiece piece;
   final double cell;
   final bool highlighted;
   final VoidCallback onTap;
+  final int stackIndex;
+  final int stackSize;
 
   @override
   Widget build(BuildContext context) {
-    final point = board.LudoEngine.getTokenCoords(piece.color.name, piece.position, piece.index);
-    final size = cell * 0.84;
+    final point = board.LudoEngine.getTokenCoords(
+      piece.color.name,
+      piece.position,
+      piece.index,
+      stackIndex: stackIndex,
+      stackSize: stackSize,
+    );
+    final size = cell * (stackSize == 1 ? 0.84 : 0.84 / math.sqrt(stackSize).ceil());
     return AnimatedPositioned(
       duration: const Duration(milliseconds: 320),
       curve: Curves.easeOutCubic,

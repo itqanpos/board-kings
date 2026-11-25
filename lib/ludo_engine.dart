@@ -67,8 +67,24 @@ class LudoEngine {
 
   static const List<int> safeSpots = [0, 8, 13, 21, 26, 34, 39, 47];
 
-  // Precise coordinate mapping for 15x15 Ludo Board
-  static List<double> getTokenCoords(String color, int pos, int index) {
+  /// Returns the absolute shared-track square for a piece's relative progress.
+  /// Returns null for base, home-lane, finished, or invalid positions.
+  static int? getAbsoluteTrackPosition(String color, int pos) {
+    final offset = startOffsets[color];
+    if (offset == null || pos < 0 || pos >= 52) return null;
+    return (offset + pos) % 52;
+  }
+
+  /// Precise coordinate mapping for the 15x15 board.
+  /// [pos] remains relative game progress; color selects the correct route entry.
+  /// Stack offsets affect drawing only and never feed back into game rules.
+  static List<double> getTokenCoords(
+    String color,
+    int pos,
+    int index, {
+    int stackIndex = 0,
+    int stackSize = 1,
+  }) {
     if (pos == -1) {
       // Base slots coordinates
       final baseOffsets = {
@@ -77,25 +93,66 @@ class LudoEngine {
         'yellow': [[1.5, 10.5], [3.5, 10.5], [1.5, 12.5], [3.5, 12.5]],
         'blue': [[10.5, 10.5], [12.5, 10.5], [10.5, 12.5], [12.5, 12.5]],
       };
-      var slots = baseOffsets[color]!;
+      final slots = baseOffsets[color]!;
       return slots[index];
-    } else if (pos >= 52 && pos <= 57) {
-      // Home stretch coordinates
-      int step = pos - 52;
-      final stretchCoords = {
-        'red': [[1.0 + step, 7.0]],
-        'green': [[7.0, 1.0 + step]],
-        'yellow': [[13.0 - step, 7.0]],
-        'blue': [[7.0, 13.0 - step]],
-      };
-      return stretchCoords[color]![0];
-    } else if (pos == 58) {
-      // Center winning position
-      return [7.0, 7.0];
-    } else {
-      // Main 52 track coordinates mapping simplified for professional grid
-      return _getMainTrackCoords(pos);
     }
+
+    late final List<double> point;
+    if (pos >= 52 && pos <= 57) {
+      final step = pos - 52;
+      final stretchCoords = {
+        'red': [1.0 + step, 7.0],
+        'green': [7.0, 1.0 + step],
+        'yellow': [13.0 - step, 7.0],
+        'blue': [7.0, 13.0 - step],
+      };
+      point = stretchCoords[color]!;
+    } else if (pos == 58) {
+      point = [7.0, 7.0];
+    } else {
+      final absolutePosition = getAbsoluteTrackPosition(color, pos);
+      point = absolutePosition == null
+          ? [7.0, 7.0]
+          : _getMainTrackCoords(absolutePosition);
+    }
+
+    return _applyStackOffset(point, stackIndex, stackSize);
+  }
+
+  static List<double> _applyStackOffset(
+    List<double> point,
+    int stackIndex,
+    int stackSize,
+  ) {
+    if (stackSize <= 1 || stackIndex < 0 || stackIndex >= stackSize) {
+      return point;
+    }
+
+    if (stackSize == 2) {
+      return [point[0] + (stackIndex == 0 ? -0.26 : 0.26), point[1]];
+    }
+
+    if (stackSize <= 4) {
+      const offsets = [
+        [-0.26, -0.26],
+        [0.26, -0.26],
+        [-0.26, 0.26],
+        [0.26, 0.26],
+      ];
+      return [
+        point[0] + offsets[stackIndex][0],
+        point[1] + offsets[stackIndex][1],
+      ];
+    }
+
+    const columns = 4;
+    final rows = (stackSize / columns).ceil();
+    final column = stackIndex % columns;
+    final row = stackIndex ~/ columns;
+    return [
+      point[0] + (column - (columns - 1) / 2) * 0.32,
+      point[1] + (row - (rows - 1) / 2) * 0.32,
+    ];
   }
 
   static List<double> _getMainTrackCoords(int pos) {
