@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/local_game_journal.dart';
@@ -35,6 +37,11 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
   bool _aiBusy = false;
   GameAiDifficulty _aiDifficulty = GameAiDifficulty.medium;
   Timer? _aiTimer;
+  Timer? _turnTimer;
+  final List<DominoGameState> _history = [];
+  int _remainingSeconds = 30;
+  int _clockPlayer = -1;
+  bool _soundEnabled = true;
   String _tableSkin = 'domino_table_classic';
   String _tilesSkin = 'domino_tiles_classic';
 
@@ -43,6 +50,7 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
     super.initState();
     _game = DominoGameState.initial(widget.playerCount, random: Random.secure());
     _message = 'اللاعب ${_game.currentTurnPlayer + 1} يبدأ بالقطعة الافتتاحية';
+    _startTurnClock();
     _loadEquippedCosmetics();
   }
 
@@ -69,6 +77,147 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
   bool get _hasMove => DominoEngine.hasAnyValidMove(_game, _player);
   bool get _canDraw => !_isAiTurn && !_hasMove && _game.drawPile.isNotEmpty && _game.winner == null;
   bool get _canPass => !_isAiTurn && !_hasMove && _game.drawPile.isEmpty && _game.winner == null;
+  String get _turnHint {
+    if (_isAiTurn) return 'دور الذكاء الاصطناعي';
+    if (_selectedTile != null) return 'اختر الطرف الذي تريد وضع القطعة عنده';
+    if (_hasMove) return 'اختر قطعة مضاءة للعب';
+    if (_game.drawPile.isNotEmpty) return 'لا توجد حركة؛ اسحب قطعة';
+    return 'لا توجد حركة ولا قطع للسحب؛ مرّر الدور';
+  }
+
+  void _startTurnClock() {
+    _turnTimer?.cancel();
+    _clockPlayer = _player;
+    _remainingSeconds = 30;
+    _turnTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || _game.winner != null) return;
+      if (_clockPlayer != _player) {
+        setState(() {
+          _clockPlayer = _player;
+          _remainingSeconds = 30;
+        });
+      } else if (_remainingSeconds > 0) {
+        setState(() => _remainingSeconds--);
+      }
+    });
+  }
+
+  void _rememberGame() {
+    _history.add(_game);
+    if (_history.length > 60) _history.removeAt(0);
+  }
+
+  void _playClick() {
+    if (_soundEnabled) unawaited(SystemSound.play(SystemSoundType.click));
+  }
+
+  void _undo() {
+    if (_history.isEmpty) return;
+    _aiTimer?.cancel();
+    _aiBusy = false;
+    setState(() {
+      _game = _history.removeLast();
+      _selectedTile = null;
+      _message = 'تم التراجع عن الحركة الأخيرة';
+    });
+    _playClick();
+    _scheduleAiTurn();
+  }
+
+  Future<void> _openQuickChat() async {
+    const messages = [
+      'حركة جميلة!',
+      'حظاً موفقاً',
+      'دوري الآن',
+      'لنلعب جولة أخرى',
+    ];
+    final message = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: panel,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('الدردشة السريعة', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 12),
+              for (final text in messages)
+                ListTile(
+                  leading: const Icon(Icons.chat_bubble_outline_rounded, color: aqua),
+                  title: Text(text),
+                  onTap: () => Navigator.pop(sheetContext, text),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (message != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('رسالة سريعة: $message'), duration: const Duration(seconds: 2)),
+      );
+    }
+  }
+
+  Future<void> _openSettings() async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, refreshDialog) => AlertDialog(
+          backgroundColor: panel,
+          title: const Text('إعدادات المباراة'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('الأصوات'),
+                value: _soundEnabled,
+                onChanged: (value) {
+                  setState(() => _soundEnabled = value);
+                  refreshDialog(() {});
+                  _playClick();
+                },
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('اللاعبون الآليون'),
+                value: _aiEnabled,
+                onChanged: (value) {
+                  setState(() => _aiEnabled = value);
+                  refreshDialog(() {});
+                  if (value) {
+                    _scheduleAiTurn();
+                  } else {
+                    _aiTimer?.cancel();
+                    _aiBusy = false;
+                  }
+                },
+              ),
+              if (_aiEnabled)
+                DropdownButtonFormField<GameAiDifficulty>(
+                  value: _aiDifficulty,
+                  decoration: const InputDecoration(labelText: 'مستوى الذكاء الاصطناعي'),
+                  items: const [
+                    DropdownMenuItem(value: GameAiDifficulty.easy, child: Text('سهل')),
+                    DropdownMenuItem(value: GameAiDifficulty.medium, child: Text('متوسط')),
+                    DropdownMenuItem(value: GameAiDifficulty.hard, child: Text('صعب')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) setState(() => _aiDifficulty = value);
+                    refreshDialog(() {});
+                  },
+                ),
+            ],
+          ),
+          actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('تم'))],
+        ),
+      ),
+    );
+  }
 
   void _scheduleAiTurn() {
     if (!_isAiTurn || _aiBusy || _game.winner != null) return;
@@ -100,6 +249,7 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
         next = DominoEngine.passTurn(next, player, widget.playerCount);
       }
 
+      if (!identical(next, _game)) _rememberGame();
       setState(() {
         _game = next;
         _selectedTile = null;
@@ -116,6 +266,7 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
   @override
   void dispose() {
     _aiTimer?.cancel();
+    _turnTimer?.cancel();
     super.dispose();
   }
 
@@ -143,6 +294,8 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
     if (_isAiTurn) return;
     final next = DominoEngine.playTile(_game, _player, tile, onLeft);
     if (identical(next, _game)) return;
+    _rememberGame();
+    _playClick();
     setState(() {
       _game = next;
       _selectedTile = null;
@@ -157,6 +310,8 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
   void _draw() {
     final next = DominoEngine.drawTile(_game, _player);
     if (identical(next, _game)) return;
+    _rememberGame();
+    _playClick();
     setState(() {
       _game = next;
       _message = DominoEngine.hasAnyValidMove(next, _player)
@@ -170,6 +325,8 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
   void _pass() {
     final next = DominoEngine.passTurn(_game, _player, widget.playerCount);
     if (identical(next, _game)) return;
+    _rememberGame();
+    _playClick();
     setState(() {
       _game = next;
       _message = next.winner == null
@@ -183,9 +340,12 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
   void _restart() {
     _aiTimer?.cancel();
     _aiBusy = false;
+    _history.clear();
     setState(() {
       _game = DominoGameState.initial(widget.playerCount, random: Random.secure());
       _selectedTile = null;
+      _clockPlayer = _game.currentTurnPlayer;
+      _remainingSeconds = 30;
       _message = 'اللاعب ${_game.currentTurnPlayer + 1} يبدأ بالقطعة الافتتاحية';
     });
     _scheduleAiTurn();
@@ -214,51 +374,100 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
     );
   }
 
+  void _onMenuSelection(String value) {
+    switch (value) {
+      case 'undo':
+        _undo();
+        break;
+      case 'chat':
+        unawaited(_openQuickChat());
+        break;
+      case 'sound':
+        setState(() => _soundEnabled = !_soundEnabled);
+        _playClick();
+        break;
+      case 'settings':
+        unawaited(_openSettings());
+        break;
+      case 'cosmetics':
+        unawaited(_openCosmetics());
+        break;
+      case 'restart':
+        _restart();
+        break;
+      case 'off':
+      case 'easy':
+      case 'medium':
+      case 'hard':
+        setState(() {
+          _aiEnabled = value != 'off';
+          if (value == 'easy') _aiDifficulty = GameAiDifficulty.easy;
+          if (value == 'medium') _aiDifficulty = GameAiDifficulty.medium;
+          if (value == 'hard') _aiDifficulty = GameAiDifficulty.hard;
+        });
+        if (!_aiEnabled) {
+          _aiTimer?.cancel();
+          _aiBusy = false;
+        } else {
+          _scheduleAiTurn();
+        }
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(
           title: const Text('الدومينو'),
           leading: IconButton(tooltip: 'إنهاء المباراة', onPressed: () => context.pop(), icon: const Icon(Icons.arrow_forward_rounded)),
-          actions: [
-            IconButton(
-              tooltip: 'المظاهر',
-              onPressed: _openCosmetics,
-              icon: const Icon(Icons.storefront_rounded),
-            ),
-            PopupMenuButton<String>(
-              tooltip: 'إعدادات الذكاء الاصطناعي',
-              onSelected: (value) {
-                setState(() {
-                  _aiEnabled = value != 'off';
-                  if (value == 'easy') _aiDifficulty = GameAiDifficulty.easy;
-                  if (value == 'medium') _aiDifficulty = GameAiDifficulty.medium;
-                  if (value == 'hard') _aiDifficulty = GameAiDifficulty.hard;
-                });
-                if (!_aiEnabled) {
-                  _aiTimer?.cancel();
-                  _aiBusy = false;
-                } else {
-                  _scheduleAiTurn();
-                }
-              },
-              itemBuilder: (context) => const [
-                PopupMenuItem(value: 'off', child: Text('إيقاف الذكاء الاصطناعي')),
-                PopupMenuItem(value: 'easy', child: Text('ذكاء اصطناعي سهل')),
-                PopupMenuItem(value: 'medium', child: Text('ذكاء اصطناعي متوسط')),
-                PopupMenuItem(value: 'hard', child: Text('ذكاء اصطناعي صعب')),
-              ],
-              icon: Icon(_aiEnabled ? Icons.smart_toy_rounded : Icons.smart_toy_outlined),
-            ),
-            IconButton(tooltip: 'إعادة المباراة', onPressed: _restart, icon: const Icon(Icons.refresh_rounded)),
-          ],
+          actions: MediaQuery.sizeOf(context).width < 620
+              ? [
+                  PopupMenuButton<String>(
+                    tooltip: 'أدوات المباراة',
+                    onSelected: _onMenuSelection,
+                    itemBuilder: (context) => [
+                      PopupMenuItem(value: 'undo', enabled: _history.isNotEmpty, child: const Text('تراجع عن الحركة')),
+                      const PopupMenuItem(value: 'chat', child: Text('الدردشة السريعة')),
+                      PopupMenuItem(value: 'sound', child: Text(_soundEnabled ? 'كتم الصوت' : 'تشغيل الصوت')),
+                      const PopupMenuItem(value: 'settings', child: Text('إعدادات المباراة')),
+                      const PopupMenuItem(value: 'cosmetics', child: Text('المظاهر')),
+                      const PopupMenuItem(value: 'easy', child: Text('ذكاء اصطناعي سهل')),
+                      const PopupMenuItem(value: 'medium', child: Text('ذكاء اصطناعي متوسط')),
+                      const PopupMenuItem(value: 'hard', child: Text('ذكاء اصطناعي صعب')),
+                      const PopupMenuItem(value: 'off', child: Text('إيقاف الذكاء الاصطناعي')),
+                      const PopupMenuItem(value: 'restart', child: Text('إعادة المباراة')),
+                    ],
+                  ),
+                ]
+              : [
+                  IconButton(tooltip: 'تراجع', onPressed: _history.isEmpty ? null : _undo, icon: const Icon(Icons.undo_rounded)),
+                  IconButton(tooltip: 'الدردشة السريعة', onPressed: _openQuickChat, icon: const Icon(Icons.chat_bubble_outline_rounded)),
+                  IconButton(tooltip: _soundEnabled ? 'كتم الصوت' : 'تشغيل الصوت', onPressed: () { setState(() => _soundEnabled = !_soundEnabled); _playClick(); }, icon: Icon(_soundEnabled ? Icons.volume_up_rounded : Icons.volume_off_rounded)),
+                  IconButton(tooltip: 'إعدادات المباراة', onPressed: _openSettings, icon: const Icon(Icons.settings_rounded)),
+                  IconButton(tooltip: 'المظاهر', onPressed: _openCosmetics, icon: const Icon(Icons.storefront_rounded)),
+                  PopupMenuButton<String>(
+                    tooltip: 'مستوى الذكاء الاصطناعي',
+                    onSelected: _onMenuSelection,
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(value: 'off', child: Text('إيقاف الذكاء الاصطناعي')),
+                      PopupMenuItem(value: 'easy', child: Text('ذكاء اصطناعي سهل')),
+                      PopupMenuItem(value: 'medium', child: Text('ذكاء اصطناعي متوسط')),
+                      PopupMenuItem(value: 'hard', child: Text('ذكاء اصطناعي صعب')),
+                    ],
+                    icon: Icon(_aiEnabled ? Icons.smart_toy_rounded : Icons.smart_toy_outlined),
+                  ),
+                  IconButton(tooltip: 'إعادة المباراة', onPressed: _restart, icon: const Icon(Icons.refresh_rounded)),
+                ],
         ),
         body: SafeArea(
           top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 3, 14, 12),
-            child: Column(
-              children: [
-                _TurnSummary(player: _player, message: _message, stock: _game.drawPile.length),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final shortScreen = constraints.maxHeight < 610;
+              final content = Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                _TurnSummary(player: _player, message: _message, stock: _game.drawPile.length, seconds: _remainingSeconds),
                 const SizedBox(height: 10),
                 Row(
                   children: List.generate(widget.playerCount, (index) {
@@ -299,56 +508,88 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
                   }),
                 ),
                 const SizedBox(height: 10),
-                Expanded(
-                  flex: 5,
+                SizedBox(
+                  height: shortScreen ? 190 : (constraints.maxHeight * 0.42).clamp(255.0, 410.0).toDouble(),
                   child: Container(
                     width: double.infinity,
+                    padding: const EdgeInsets.all(7),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topRight,
-                        end: Alignment.bottomLeft,
-                        colors: [
-                          _tableFill(_tableSkin),
-                          Color.lerp(_tableFill(_tableSkin), ink, 0.3)!,
-                          _tableFill(_tableSkin),
-                        ],
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF9B7045), Color(0xFF3D291B), Color(0xFF785331)],
                       ),
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(color: _skinAccent(_tableSkin.replaceFirst('domino_table_', '')).withOpacity(0.8), width: 2),
-                      boxShadow: [BoxShadow(color: _skinAccent(_tableSkin.replaceFirst('domino_table_', '')).withOpacity(0.08), blurRadius: 20, offset: const Offset(0, 8))],
+                      borderRadius: BorderRadius.circular(23),
+                      border: Border.all(color: gold, width: 1.5),
+                      boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 18, offset: Offset(0, 8))],
                     ),
-                    child: _game.board.isEmpty
-                        ? Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                width: 62,
-                                height: 62,
-                                decoration: BoxDecoration(color: Colors.white.withOpacity(0.07), shape: BoxShape.circle, border: Border.all(color: Colors.white.withOpacity(0.1))),
-                                child: const Icon(Icons.extension_rounded, color: Colors.white70, size: 29),
+                    child: Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topRight,
+                          end: Alignment.bottomLeft,
+                          colors: [
+                            _tableFill(_tableSkin),
+                            Color.lerp(_tableFill(_tableSkin), ink, 0.3)!,
+                            _tableFill(_tableSkin),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: _skinAccent(_tableSkin.replaceFirst('domino_table_', '')).withOpacity(0.72)),
+                      ),
+                        child: _game.board.isEmpty
+                          ? _DominoDropTarget(
+                              canAccept: _isPlayable,
+                              onAccept: (tile) => _placeTile(tile, false),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    width: 62,
+                                    height: 62,
+                                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.07), shape: BoxShape.circle, border: Border.all(color: Colors.white.withOpacity(0.1))),
+                                    child: const Icon(Icons.extension_rounded, color: Colors.white70, size: 29),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  const Text('الطاولة جاهزة', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                                  const SizedBox(height: 5),
+                                  const Text('اسحب القطعة الافتتاحية إلى الطاولة', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                                ],
                               ),
-                              const SizedBox(height: 12),
-                              const Text('الطاولة جاهزة', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
-                              const SizedBox(height: 5),
-                              const Text('ضع القطعة الافتتاحية لبدء السلسلة', style: TextStyle(color: Colors.white70, fontSize: 11)),
-                            ],
-                          )
-                        : SingleChildScrollView(
+                            )
+                          : SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
                             reverse: false,
                             child: Center(
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  _EndMarker(label: 'طرف ${_game.leftEnd}'),
-                                  ..._game.board.map((tile) => DominoTileFace(tile: tile, compact: true, styleId: _tilesSkin.replaceFirst('domino_tiles_', ''))),
-                                  _EndMarker(label: 'طرف ${_game.rightEnd}'),
+                                  _DominoDropTarget(
+                                    canAccept: (tile) => _isPlayable(tile) && _fitsLeft(tile),
+                                    onAccept: (tile) => _placeTile(tile, true),
+                                    child: _EndMarker(label: 'طرف ${_game.leftEnd}'),
+                                  ),
+                                  ..._game.board.map((tile) => TweenAnimationBuilder<double>(
+                                        key: ValueKey('${tile.id}-${tile.left}-${tile.right}'),
+                                        tween: Tween(begin: 0.65, end: 1),
+                                        duration: const Duration(milliseconds: 280),
+                                        curve: Curves.easeOutBack,
+                                        builder: (context, scale, child) => Transform.scale(scale: scale, child: child),
+                                        child: DominoTileFace(tile: tile, compact: true, styleId: _tilesSkin.replaceFirst('domino_tiles_', '')),
+                                      )),
+                                  _DominoDropTarget(
+                                    canAccept: (tile) => _isPlayable(tile) && _fitsRight(tile),
+                                    onAccept: (tile) => _placeTile(tile, false),
+                                    child: _EndMarker(label: 'طرف ${_game.rightEnd}'),
+                                  ),
                                 ],
                               ),
                             ),
                           ),
+                      ),
+                    ),
                   ),
-                ),
                 const SizedBox(height: 10),
                 if (_selectedTile != null) _PlacementPicker(tile: _selectedTile!, leftEnd: _game.leftEnd!, rightEnd: _game.rightEnd!, onLeft: () => _placeTile(_selectedTile!, true), onRight: () => _placeTile(_selectedTile!, false)),
                 if (_selectedTile != null) const SizedBox(height: 8),
@@ -378,39 +619,88 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
                     separatorBuilder: (_, __) => const SizedBox(width: 7),
                     itemBuilder: (context, index) {
                       final tile = _activeHand[index];
-                      return DominoTileFace(
+                      final playable = _isPlayable(tile);
+                      final face = DominoTileFace(
                         tile: tile,
                         selected: _selectedTile?.id == tile.id,
-                        enabled: _isPlayable(tile),
-                        onTap: _isPlayable(tile) ? () => _selectTile(tile) : null,
+                        enabled: playable,
+                        onTap: playable ? () => _selectTile(tile) : null,
                         styleId: _tilesSkin.replaceFirst('domino_tiles_', ''),
+                      );
+                      if (!playable) return face;
+                      return Draggable<DominoTile>(
+                        data: tile,
+                        feedback: Material(
+                          type: MaterialType.transparency,
+                          child: DominoTileFace(tile: tile, selected: true, styleId: _tilesSkin.replaceFirst('domino_tiles_', '')),
+                        ),
+                        childWhenDragging: Opacity(opacity: 0.28, child: face),
+                        child: face,
                       );
                     },
                   ),
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  _isAiTurn
-                      ? 'دور الذكاء الاصطناعي'
-                      : _hasMove
-                          ? 'اختر قطعة مضاءة للعب'
-                          : _game.drawPile.isNotEmpty
-                              ? 'لا توجد حركة؛ اسحب قطعة'
-                              : 'لا توجد حركة ولا قطع للسحب؛ مرّر الدور',
+                  _turnHint,
                   style: const TextStyle(color: mutedText, fontSize: 11),
                 ),
               ],
-            ),
+              );
+              return Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1120),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 3, 14, 18),
+                    child: SingleChildScrollView(child: content),
+                  ),
+                ),
+              );
+            },
           ),
         ),
       );
 }
 
+class _DominoDropTarget extends StatelessWidget {
+  const _DominoDropTarget({
+    required this.canAccept,
+    required this.onAccept,
+    required this.child,
+  });
+
+  final bool Function(DominoTile tile) canAccept;
+  final ValueChanged<DominoTile> onAccept;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => DragTarget<DominoTile>(
+        onWillAcceptWithDetails: (details) => canAccept(details.data),
+        onAcceptWithDetails: (details) => onAccept(details.data),
+        builder: (context, candidates, rejected) {
+          final hovering = candidates.isNotEmpty;
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+            decoration: BoxDecoration(
+              color: hovering ? gold.withOpacity(0.22) : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: hovering ? gold : Colors.transparent,
+                width: 1.5,
+              ),
+            ),
+            child: child,
+          );
+        },
+      );
+
 class _TurnSummary extends StatelessWidget {
-  const _TurnSummary({required this.player, required this.message, required this.stock});
+  const _TurnSummary({required this.player, required this.message, required this.stock, required this.seconds});
   final int player;
   final String message;
   final int stock;
+  final int seconds;
 
   @override
   Widget build(BuildContext context) {
@@ -454,10 +744,31 @@ class _TurnSummary extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
-            decoration: BoxDecoration(color: panelRaised, borderRadius: BorderRadius.circular(12)),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.inventory_2_outlined, color: aqua, size: 14), const SizedBox(height: 2), Text('$stock', style: const TextStyle(color: aqua, fontSize: 10, fontWeight: FontWeight.w900))]),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                decoration: BoxDecoration(
+                  color: seconds <= 10 ? coral.withOpacity(0.16) : panelRaised,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: seconds <= 10 ? coral.withOpacity(0.65) : Colors.white.withOpacity(0.06)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.hourglass_bottom_rounded, color: seconds <= 10 ? coral : gold, size: 14),
+                    const SizedBox(width: 4),
+                    Text('0:${seconds.toString().padLeft(2, '0')}', style: TextStyle(color: seconds <= 10 ? coral : Colors.white, fontSize: 11, fontWeight: FontWeight.w900, fontFeatures: const [FontFeature.tabularFigures()])),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+                decoration: BoxDecoration(color: panelRaised, borderRadius: BorderRadius.circular(12)),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.inventory_2_outlined, color: aqua, size: 14), const SizedBox(height: 2), Text('$stock', style: const TextStyle(color: aqua, fontSize: 10, fontWeight: FontWeight.w900))]),
+              ),
+            ],
           ),
         ],
       ),
