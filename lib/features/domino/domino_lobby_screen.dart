@@ -19,9 +19,13 @@ class _DominoLobbyScreenState extends State<DominoLobbyScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('اضبط المباراة', style: Theme.of(context).textTheme.headlineMedium),
-            const SizedBox(height: 8),
-            const Text('تُدار الجولة بالكامل بواسطة محرك الدومينو المحلي.', style: TextStyle(color: mutedText)),
+            GameLobbyHero(
+              title: 'اضبط طاولة الدومينو',
+              subtitle: 'حدد عدد المقاعد ثم ابدأ جولة على هذا الجهاز.',
+              badge: _players == 2 ? 'مقعدان • محلي' : '$_players مقاعد • محلي',
+              icon: Icons.extension_rounded,
+              accent: aqua,
+            ),
             const SizedBox(height: 22),
             const Text('عدد اللاعبين', style: TextStyle(fontWeight: FontWeight.w800)),
             const SizedBox(height: 10),

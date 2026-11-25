@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/local_game_journal.dart';
 import '../../shared/widgets/game_ui.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -66,9 +67,9 @@ class HomeScreen extends StatelessWidget {
                       onTap: () => context.push('/domino-lobby'),
                     ),
                     const SizedBox(height: 28),
-                    const SectionTitle('آخر المباريات'),
+                    SectionTitle('آخر المباريات', action: 'عرض السجل', onAction: () => context.push('/history')),
                     const SizedBox(height: 12),
-                    const _RecentGamesEmpty(),
+                    const _RecentGamesPreview(),
                     const SizedBox(height: 22),
                     Row(
                       children: [
@@ -82,9 +83,29 @@ class HomeScreen extends StatelessWidget {
                         const SizedBox(width: 12),
                         Expanded(
                           child: _ShortcutCard(
-                            icon: Icons.settings_outlined,
-                            label: 'الإعدادات',
-                            onTap: () => context.push('/settings'),
+                            icon: Icons.groups_2_outlined,
+                            label: 'الفرق',
+                            onTap: () => context.push('/teams'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _ShortcutCard(
+                            icon: Icons.table_restaurant_rounded,
+                            label: 'الغرف والطاولات',
+                            onTap: () => context.push('/rooms'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _ShortcutCard(
+                            icon: Icons.notifications_none_rounded,
+                            label: 'الإشعارات',
+                            onTap: () => context.push('/notifications'),
                           ),
                         ),
                       ],
@@ -128,12 +149,9 @@ class _PlayerSummary extends StatelessWidget {
                   children: [
                     const Text('لاعب محلي', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
                     const SizedBox(height: 5),
-                    const Text('المستوى ١  •  مبتدئ', style: TextStyle(color: mutedText, fontSize: 12)),
+                    const Text('ملف محلي على هذا الجهاز', style: TextStyle(color: mutedText, fontSize: 12)),
                     const SizedBox(height: 11),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: const LinearProgressIndicator(value: 0.35, minHeight: 5, color: aqua, backgroundColor: Color(0xFF34435A)),
-                    ),
+                    const Text('النتائج والإحصاءات من مبارياتك المكتملة', style: TextStyle(color: mutedText, fontSize: 11)),
                   ],
                 ),
               ),
@@ -200,17 +218,55 @@ class _GameCard extends StatelessWidget {
       );
 }
 
-class _RecentGamesEmpty extends StatelessWidget {
-  const _RecentGamesEmpty();
+class _RecentGamesPreview extends StatelessWidget {
+  const _RecentGamesPreview();
 
   @override
-  Widget build(BuildContext context) => const SurfaceCard(
-        child: Row(
-          children: [
-            Icon(Icons.history_rounded, color: mutedText, size: 25),
-            SizedBox(width: 12),
-            Expanded(child: Text('ستظهر مبارياتك المحلية هنا بعد لعب أول جولة.', style: TextStyle(color: mutedText))),
-          ],
+  Widget build(BuildContext context) => ValueListenableBuilder<int>(
+        valueListenable: LocalGameJournal.revision,
+        builder: (context, revision, _) => FutureBuilder<List<LocalMatchRecord>>(
+          key: ValueKey(revision),
+          future: LocalGameJournal.loadMatches(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return const SurfaceCard(
+                child: Text('تعذر تحميل سجل المباريات من هذا الجهاز.', style: TextStyle(color: mutedText)),
+              );
+            }
+            if (!snapshot.hasData) {
+              return const SurfaceCard(
+                child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))),
+              );
+            }
+            final matches = snapshot.data!;
+            if (matches.isEmpty) {
+              return const SurfaceCard(
+                child: Row(
+                  children: [
+                    Icon(Icons.history_rounded, color: mutedText, size: 25),
+                    SizedBox(width: 12),
+                    Expanded(child: Text('لا توجد مباريات مكتملة مسجلة بعد.', style: TextStyle(color: mutedText))),
+                  ],
+                ),
+              );
+            }
+            return SurfaceCard(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Column(
+                children: matches.take(2).map((match) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      Icon(match.game == 'ludo' ? Icons.casino_rounded : Icons.extension_rounded, color: match.game == 'ludo' ? coral : aqua),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text('${match.gameLabel} • الفائز: ${match.winner}', style: const TextStyle(fontWeight: FontWeight.w700))),
+                      const Icon(Icons.emoji_events_rounded, color: gold, size: 18),
+                    ],
+                  ),
+                )).toList(),
+              ),
+            );
+          },
         ),
       );
 }
@@ -230,7 +286,20 @@ class _ShortcutCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 17),
-            child: Row(children: [Icon(icon, color: aqua), const SizedBox(width: 10), Text(label, style: const TextStyle(fontWeight: FontWeight.w700))]),
+            child: Row(
+              children: [
+                Icon(icon, color: aqua),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );

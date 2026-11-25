@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../shared/widgets/game_ui.dart';
 
@@ -27,6 +28,12 @@ class FriendsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               const ComingSoonLabel(label: 'الميزات الاجتماعية غير متاحة'),
+              const SizedBox(height: 16),
+              GameActionButton(
+                label: 'العب محلياً الآن',
+                icon: Icons.table_restaurant_rounded,
+                onPressed: () => context.push('/rooms'),
+              ),
             ],
           ),
         ),

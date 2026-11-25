@@ -12,9 +12,13 @@ class LudoLobbyScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('جهّز الطاولة', style: Theme.of(context).textTheme.headlineMedium),
-            const SizedBox(height: 8),
-            const Text('ابدأ مباراة محلية لأربعة لاعبين. لا يتطلب اللعب اتصالاً أو حساباً.', style: TextStyle(color: mutedText)),
+            const GameLobbyHero(
+              title: 'جهّز طاولة لودو',
+              subtitle: 'ابدأ جولة كاملة على جهاز واحد، دون اتصال أو حساب.',
+              badge: '٤ مقاعد محلية',
+              icon: Icons.casino_rounded,
+              accent: coral,
+            ),
             const SizedBox(height: 22),
             const SurfaceCard(
               child: Column(

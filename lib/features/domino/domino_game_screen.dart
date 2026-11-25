@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/local_game_journal.dart';
 import '../../shared/widgets/game_ui.dart';
 import '../game_ai_difficulty.dart';
 import '../store/data/cosmetic_repository.dart';
@@ -184,6 +185,13 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
   }
 
   void _showWinner(int winner) {
+    unawaited(
+      LocalGameJournal.recordResult(
+        game: 'domino',
+        playerCount: widget.playerCount,
+        winner: 'اللاعب ${winner + 1}',
+      ).catchError((Object _) {}),
+    );
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -250,7 +258,9 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
                     final hand = _game.playerHands[index] ?? const <DominoTile>[];
                     final pips = hand.fold<int>(0, (sum, tile) => sum + tile.totalValue);
                     return Expanded(
-                      child: Container(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        curve: Curves.easeOut,
                         margin: const EdgeInsets.symmetric(horizontal: 3),
                         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
                         decoration: BoxDecoration(color: index == _player ? aqua.withOpacity(0.14) : panel, borderRadius: BorderRadius.circular(12), border: Border.all(color: index == _player ? aqua : Colors.transparent)),
@@ -359,7 +369,19 @@ class _TurnSummary extends StatelessWidget {
           children: [
             const Icon(Icons.person_pin_circle_outlined, color: aqua),
             const SizedBox(width: 8),
-            Expanded(child: Text('الدور للاعب ${player + 1}  •  $message', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: mutedText))),
+            Expanded(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+                child: Text(
+                  'الدور للاعب ${player + 1}  •  $message',
+                  key: ValueKey(message),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11, color: mutedText),
+                ),
+              ),
+            ),
             const SizedBox(width: 6),
             Text('المخزون $stock', style: const TextStyle(fontSize: 10, color: aqua, fontWeight: FontWeight.w800)),
           ],
@@ -368,7 +390,16 @@ class _TurnSummary extends StatelessWidget {
 }
 
 class DominoTileFace extends StatelessWidget {
-  const DominoTileFace({super.key, required this.tile, this.enabled = true, this.selected = false, this.compact = false, this.onTap, this.styleId = 'classic'});
+  const DominoTileFace({
+    super.key,
+    required this.tile,
+    this.enabled = true,
+    this.selected = false,
+    this.compact = false,
+    this.onTap,
+    this.styleId = 'classic',
+  });
+
   final DominoTile tile;
   final bool enabled;
   final bool selected;
@@ -384,28 +415,59 @@ class DominoTileFace extends StatelessWidget {
     final faceColor = selected ? const Color(0xFF33455B) : _tileFaceColor(styleId);
     final numberColor = darkFace || selected ? const Color(0xFFF5F0E8) : ink;
     final strokeColor = selected ? coral : _skinAccent(styleId);
+
     return Semantics(
       button: onTap != null,
       label: 'قطعة دومينو ${tile.left} إلى ${tile.right}${enabled ? '، قابلة للعب' : ''}',
-      child: Opacity(
-        opacity: enabled ? 1 : 0.42,
-        child: Material(
-          color: faceColor,
-          borderRadius: BorderRadius.circular(12),
-          child: InkWell(
-            onTap: onTap,
+      child: AnimatedScale(
+        scale: selected ? 1.04 : 1,
+        duration: const Duration(milliseconds: 170),
+        curve: Curves.easeOutBack,
+        child: Opacity(
+          opacity: enabled ? 1 : 0.42,
+          child: Material(
+            color: faceColor,
             borderRadius: BorderRadius.circular(12),
-            child: Container(
-              width: width,
-              height: height,
-              padding: const EdgeInsets.all(5),
-              decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: strokeColor, width: selected ? 2 : 1.5)),
-              child: Column(
-                children: [
-                  Expanded(child: Center(child: Text('${tile.left}', style: TextStyle(color: numberColor, fontSize: compact ? 16 : 20, fontWeight: FontWeight.w900)))),
-                  Container(height: 1, color: const Color(0xFFBDB5A5)),
-                  Expanded(child: Center(child: Text('${tile.right}', style: TextStyle(color: numberColor, fontSize: compact ? 16 : 20, fontWeight: FontWeight.w900)))),
-                ],
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                width: width,
+                height: height,
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: strokeColor, width: selected ? 2 : 1.5),
+                ),
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          '${tile.left}',
+                          style: TextStyle(
+                            color: numberColor,
+                            fontSize: compact ? 16 : 20,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Container(height: 1, color: const Color(0xFFBDB5A5)),
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          '${tile.right}',
+                          style: TextStyle(
+                            color: numberColor,
+                            fontSize: compact ? 16 : 20,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

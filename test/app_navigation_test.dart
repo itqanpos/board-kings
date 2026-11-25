@@ -1,10 +1,15 @@
 import 'package:board_kings/app/board_kings_app.dart';
+import 'package:board_kings/core/local_game_journal.dart';
 import 'package:board_kings/features/domino/domino_game_screen.dart';
 import 'package:board_kings/features/domino/engine/domino_engine.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
   testWidgets('home screen renders player, games, shortcuts, and recent games', (tester) async {
     await tester.pumpWidget(const BoardKingsApp(initialLocation: '/home'));
     await tester.pumpAndSettle();
@@ -89,6 +94,52 @@ void main() {
 
     final context = tester.element(find.text('اختر لعبتك'));
     expect(Directionality.of(context), TextDirection.rtl);
+  });
+
+  testWidgets('shared screens open without placeholder failures', (tester) async {
+    final routes = <String, String>{
+      '/rooms': 'الغرف والطاولات',
+      '/teams': 'الفرق',
+      '/history': 'سجل المباريات',
+      '/notifications': 'الإشعارات',
+      '/profile': 'الملف الشخصي',
+      '/settings': 'الإعدادات',
+      '/friends': 'الأصدقاء',
+      '/store': 'متجر BOARD KINGS',
+      '/account': 'حساب BOARD KINGS',
+    };
+
+    for (final entry in routes.entries) {
+      await tester.pumpWidget(BoardKingsApp(initialLocation: entry.key));
+      await tester.pumpAndSettle();
+      expect(find.text(entry.value), findsOneWidget, reason: 'Route ${entry.key} should render');
+    }
+  });
+
+  testWidgets('history and notifications render actual completed local results', (tester) async {
+    await LocalGameJournal.recordResult(
+      game: 'domino',
+      playerCount: 2,
+      winner: 'اللاعب 1',
+    );
+
+    await tester.pumpWidget(const BoardKingsApp(initialLocation: '/history'));
+    await tester.pumpAndSettle();
+    expect(find.text('الفائز: اللاعب 1'), findsOneWidget);
+
+    await tester.pumpWidget(const BoardKingsApp(initialLocation: '/notifications'));
+    await tester.pumpAndSettle();
+    expect(find.text('اكتملت مباراة الدومينو'), findsOneWidget);
+  });
+
+  testWidgets('rooms open the existing local game lobby', (tester) async {
+    await tester.pumpWidget(const BoardKingsApp(initialLocation: '/rooms'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('طاولة لودو'));
+    await tester.pumpAndSettle();
+    expect(find.text('ردهة لودو'), findsOneWidget);
+    expect(find.text('اللعب السريع المحلي'), findsOneWidget);
   });
 
   testWidgets('unknown navigation paths show a recoverable error screen', (tester) async {

@@ -8,7 +8,11 @@ import '../features/domino/domino_game_screen.dart';
 import '../features/domino/domino_lobby_screen.dart';
 import '../features/friends/friends_screen.dart';
 import '../features/games/game_selection_screen.dart';
+import '../features/history/match_history_screen.dart';
 import '../features/home/home_screen.dart';
+import '../features/notifications/notifications_screen.dart';
+import '../features/rooms/rooms_screen.dart';
+import '../features/teams/teams_screen.dart';
 import '../features/ludo/ludo_game_screen.dart';
 import '../features/ludo/ludo_lobby_screen.dart';
 import '../features/profile/profile_screen.dart';
@@ -47,6 +51,10 @@ class _BoardKingsAppState extends State<BoardKingsApp> {
       GoRoute(path: '/profile', builder: (context, state) => const ProfileScreen()),
       GoRoute(path: '/settings', builder: (context, state) => const SettingsScreen()),
       GoRoute(path: '/friends', builder: (context, state) => const FriendsScreen()),
+      GoRoute(path: '/rooms', builder: (context, state) => const RoomsScreen()),
+      GoRoute(path: '/teams', builder: (context, state) => const TeamsScreen()),
+      GoRoute(path: '/history', builder: (context, state) => const MatchHistoryScreen()),
+      GoRoute(path: '/notifications', builder: (context, state) => const NotificationsScreen()),
       GoRoute(path: '/store', builder: (context, state) => const CosmeticStoreScreen()),
       GoRoute(path: '/account', builder: (context, state) => const SupabaseAccountScreen()),
     ],

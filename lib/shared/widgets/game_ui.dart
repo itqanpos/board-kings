@@ -64,6 +64,15 @@ ThemeData buildBoardKingsTheme() {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
       side: BorderSide.none,
     ),
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {
+        TargetPlatform.android: ZoomPageTransitionsBuilder(),
+        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.windows: ZoomPageTransitionsBuilder(),
+        TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+      },
+    ),
     dividerColor: const Color(0xFF314159),
   );
 }
@@ -130,6 +139,66 @@ class SurfaceCard extends StatelessWidget {
           border: Border.all(color: Colors.white.withOpacity(0.055)),
         ),
         child: child,
+      );
+}
+
+class GameLobbyHero extends StatelessWidget {
+  const GameLobbyHero({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.badge,
+    required this.icon,
+    required this.accent,
+  });
+
+  final String title;
+  final String subtitle;
+  final String badge;
+  final IconData icon;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [accent.withOpacity(0.2), panelRaised, panel],
+          ),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: accent.withOpacity(0.32)),
+          boxShadow: [BoxShadow(color: accent.withOpacity(0.07), blurRadius: 24, offset: const Offset(0, 8))],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(color: accent.withOpacity(0.17), borderRadius: BorderRadius.circular(19)),
+              child: Icon(icon, color: accent, size: 30),
+            ),
+            const SizedBox(width: 15),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 5),
+                  Text(subtitle, style: const TextStyle(color: mutedText, height: 1.4)),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(color: accent.withOpacity(0.13), borderRadius: BorderRadius.circular(30)),
+                    child: Text(badge, style: TextStyle(color: accent, fontSize: 11, fontWeight: FontWeight.w800)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       );
 }
 

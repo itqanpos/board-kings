@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/local_game_journal.dart';
 import '../../ludo_engine.dart' as board;
 import '../../ludo_screen.dart' show AAAProLudoBoardPainter;
 import '../../shared/widgets/game_ui.dart';
@@ -189,6 +190,13 @@ class _LudoGameScreenState extends State<LudoGameScreen> {
   }
 
   void _showWinner(LudoColor winner) {
+    unawaited(
+      LocalGameJournal.recordResult(
+        game: 'ludo',
+        playerCount: LudoColor.values.length,
+        winner: _playerNames[winner]!,
+      ).catchError((Object _) {}),
+    );
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -372,7 +380,19 @@ class _PlayerTurnBar extends StatelessWidget {
           children: [
             Container(width: 10, height: 34, decoration: BoxDecoration(color: _playerColors[current], borderRadius: BorderRadius.circular(8))),
             const SizedBox(width: 11),
-            Expanded(child: Text(message, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: mutedText))),
+            Expanded(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+                child: Text(
+                  message,
+                  key: ValueKey(message),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: mutedText),
+                ),
+              ),
+            ),
           ],
         ),
       );
@@ -385,7 +405,9 @@ class _PlayerPill extends StatelessWidget {
   final int progress;
 
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) => AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 7),
         decoration: BoxDecoration(
           color: active ? _playerColors[color]!.withOpacity(0.17) : panel,

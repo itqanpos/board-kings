@@ -3,16 +3,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../shared/widgets/game_ui.dart';
 
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
-
-  @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
-}
-
-class _SettingsScreenState extends State<SettingsScreen> {
-  bool _soundEnabled = true;
-  bool _hapticsEnabled = true;
 
   @override
   Widget build(BuildContext context) => GameScaffold(
@@ -31,24 +23,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            SurfaceCard(
-              padding: EdgeInsets.zero,
-              child: Column(
+            const SurfaceCard(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SwitchListTile(
-                    value: _soundEnabled,
-                    onChanged: (value) => setState(() => _soundEnabled = value),
-                    title: const Text('المؤثرات الصوتية'),
-                    subtitle: const Text('تفضيل مؤقت لهذه الجلسة', style: TextStyle(color: mutedText, fontSize: 12)),
-                    activeColor: aqua,
-                  ),
-                  const Divider(height: 1, indent: 16, endIndent: 16),
-                  SwitchListTile(
-                    value: _hapticsEnabled,
-                    onChanged: (value) => setState(() => _hapticsEnabled = value),
-                    title: const Text('الاهتزاز'),
-                    subtitle: const Text('تفضيل مؤقت لهذه الجلسة', style: TextStyle(color: mutedText, fontSize: 12)),
-                    activeColor: aqua,
+                  Icon(Icons.volume_off_rounded, color: mutedText),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('الصوت والاهتزاز', style: TextStyle(fontWeight: FontWeight.w800)),
+                        SizedBox(height: 6),
+                        Text('لا توجد مؤثرات صوتية أو اهتزازات مدمجة حالياً؛ لذلك لا تظهر مفاتيح تبديل غير مؤثرة.', style: TextStyle(color: mutedText)),
+                      ],
+                    ),
                   ),
                 ],
               ),

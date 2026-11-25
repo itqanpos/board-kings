@@ -31,6 +31,13 @@ class GameSelectionScreen extends StatelessWidget {
               color: aqua,
               onTap: () => context.push('/domino-lobby'),
             ),
+            const SizedBox(height: 18),
+            OutlinedButton.icon(
+              onPressed: () => context.push('/rooms'),
+              icon: const Icon(Icons.table_restaurant_rounded),
+              label: const Text('الغرف والطاولات المحلية'),
+              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+            ),
           ],
         ),
       );
