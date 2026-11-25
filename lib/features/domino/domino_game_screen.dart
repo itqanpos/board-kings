@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../shared/widgets/game_ui.dart';
+import '../game_ai_difficulty.dart';
+import 'engine/domino_ai.dart';
 import 'engine/domino_engine.dart';
 
 class DominoGameScreen extends StatefulWidget {
@@ -19,6 +22,10 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
   late DominoGameState _game;
   DominoTile? _selectedTile;
   String _message = '';
+  bool _aiEnabled = false;
+  bool _aiBusy = false;
+  GameAiDifficulty _aiDifficulty = GameAiDifficulty.medium;
+  Timer? _aiTimer;
 
   @override
   void initState() {
@@ -28,12 +35,64 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
   }
 
   int get _player => _game.currentTurnPlayer;
-  List<DominoTile> get _activeHand => _game.playerHands[_player] ?? const [];
+  bool get _isAiTurn => _aiEnabled && _player != 0;
+  List<DominoTile> get _activeHand =>
+      _isAiTurn ? const [] : _game.playerHands[_player] ?? const [];
   bool get _hasMove => DominoEngine.hasAnyValidMove(_game, _player);
-  bool get _canDraw => !_hasMove && _game.drawPile.isNotEmpty && _game.winner == null;
-  bool get _canPass => !_hasMove && _game.drawPile.isEmpty && _game.winner == null;
+  bool get _canDraw => !_isAiTurn && !_hasMove && _game.drawPile.isNotEmpty && _game.winner == null;
+  bool get _canPass => !_isAiTurn && !_hasMove && _game.drawPile.isEmpty && _game.winner == null;
+
+  void _scheduleAiTurn() {
+    if (!_isAiTurn || _aiBusy || _game.winner != null) return;
+    _aiBusy = true;
+    _aiTimer = Timer(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
+      if (!_isAiTurn || _game.winner != null) {
+        _aiBusy = false;
+        return;
+      }
+
+      final player = _player;
+      var next = _game;
+      while (!DominoEngine.hasAnyValidMove(next, player) &&
+          next.drawPile.isNotEmpty) {
+        final drawn = DominoEngine.drawTile(next, player);
+        if (identical(drawn, next)) break;
+        next = drawn;
+      }
+
+      if (DominoEngine.hasAnyValidMove(next, player)) {
+        final move = DominoAi.chooseMove(next, difficulty: _aiDifficulty);
+        if (move != null) {
+          final tile = next.playerHands[player]!
+              .firstWhere((candidate) => candidate.id == move.tileId);
+          next = DominoEngine.playTile(next, player, tile, move.playOnLeft);
+        }
+      } else if (next.drawPile.isEmpty) {
+        next = DominoEngine.passTurn(next, player, widget.playerCount);
+      }
+
+      setState(() {
+        _game = next;
+        _selectedTile = null;
+        _message = next.winner == null
+            ? 'انتهى دور الذكاء الاصطناعي؛ الآن اللاعب ${next.currentTurnPlayer + 1}'
+            : 'انتهت الجولة؛ الفائز اللاعب ${next.winner! + 1}';
+      });
+      _aiBusy = false;
+      if (next.winner != null) _showWinner(next.winner!);
+      _scheduleAiTurn();
+    });
+  }
+
+  @override
+  void dispose() {
+    _aiTimer?.cancel();
+    super.dispose();
+  }
 
   bool _isPlayable(DominoTile tile) {
+    if (_isAiTurn || _game.winner != null) return false;
     if (_game.board.isEmpty) return _game.openingTileId == tile.id;
     return DominoEngine.canPlayTile(_game, tile);
   }
@@ -53,6 +112,7 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
   }
 
   void _placeTile(DominoTile tile, bool onLeft) {
+    if (_isAiTurn) return;
     final next = DominoEngine.playTile(_game, _player, tile, onLeft);
     if (identical(next, _game)) return;
     setState(() {
@@ -63,6 +123,7 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
           : 'انتهت الجولة؛ الفائز اللاعب ${next.winner! + 1}';
     });
     if (next.winner != null) _showWinner(next.winner!);
+    _scheduleAiTurn();
   }
 
   void _draw() {
@@ -88,14 +149,18 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
           : 'انتهت الجولة؛ الأقل نقاطاً هو اللاعب ${next.winner! + 1}';
     });
     if (next.winner != null) _showWinner(next.winner!);
+    _scheduleAiTurn();
   }
 
   void _restart() {
+    _aiTimer?.cancel();
+    _aiBusy = false;
     setState(() {
       _game = DominoGameState.initial(widget.playerCount, random: Random.secure());
       _selectedTile = null;
       _message = 'اللاعب ${_game.currentTurnPlayer + 1} يبدأ بالقطعة الافتتاحية';
     });
+    _scheduleAiTurn();
   }
 
   void _showWinner(int winner) {
@@ -119,7 +184,33 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
         appBar: AppBar(
           title: const Text('الدومينو'),
           leading: IconButton(tooltip: 'إنهاء المباراة', onPressed: () => context.pop(), icon: const Icon(Icons.arrow_forward_rounded)),
-          actions: [IconButton(tooltip: 'إعادة المباراة', onPressed: _restart, icon: const Icon(Icons.refresh_rounded))],
+          actions: [
+            PopupMenuButton<String>(
+              tooltip: 'إعدادات الذكاء الاصطناعي',
+              onSelected: (value) {
+                setState(() {
+                  _aiEnabled = value != 'off';
+                  if (value == 'easy') _aiDifficulty = GameAiDifficulty.easy;
+                  if (value == 'medium') _aiDifficulty = GameAiDifficulty.medium;
+                  if (value == 'hard') _aiDifficulty = GameAiDifficulty.hard;
+                });
+                if (!_aiEnabled) {
+                  _aiTimer?.cancel();
+                  _aiBusy = false;
+                } else {
+                  _scheduleAiTurn();
+                }
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(value: 'off', child: Text('إيقاف الذكاء الاصطناعي')),
+                PopupMenuItem(value: 'easy', child: Text('ذكاء اصطناعي سهل')),
+                PopupMenuItem(value: 'medium', child: Text('ذكاء اصطناعي متوسط')),
+                PopupMenuItem(value: 'hard', child: Text('ذكاء اصطناعي صعب')),
+              ],
+              icon: Icon(_aiEnabled ? Icons.smart_toy_rounded : Icons.smart_toy_outlined),
+            ),
+            IconButton(tooltip: 'إعادة المباراة', onPressed: _restart, icon: const Icon(Icons.refresh_rounded)),
+          ],
         ),
         body: SafeArea(
           top: false,
@@ -180,7 +271,12 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
                 const SizedBox(height: 9),
                 Align(
                   alignment: Alignment.centerRight,
-                  child: Text('يد اللاعب ${_player + 1}  •  ${_activeHand.length} قطع', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+                  child: Text(
+                    _isAiTurn
+                        ? 'الذكاء الاصطناعي يفكر...'
+                        : 'يد اللاعب ${_player + 1}  •  ${_activeHand.length} قطع',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                  ),
                 ),
                 const SizedBox(height: 6),
                 SizedBox(
@@ -201,7 +297,16 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
                   ),
                 ),
                 const SizedBox(height: 5),
-                Text(_hasMove ? 'اختر قطعة مضاءة للعب' : _game.drawPile.isNotEmpty ? 'لا توجد حركة؛ اسحب قطعة' : 'لا توجد حركة ولا قطع للسحب؛ مرّر الدور', style: const TextStyle(color: mutedText, fontSize: 11)),
+                Text(
+                  _isAiTurn
+                      ? 'دور الذكاء الاصطناعي'
+                      : _hasMove
+                          ? 'اختر قطعة مضاءة للعب'
+                          : _game.drawPile.isNotEmpty
+                              ? 'لا توجد حركة؛ اسحب قطعة'
+                              : 'لا توجد حركة ولا قطع للسحب؛ مرّر الدور',
+                  style: const TextStyle(color: mutedText, fontSize: 11),
+                ),
               ],
             ),
           ),

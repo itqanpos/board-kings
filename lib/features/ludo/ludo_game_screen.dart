@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -6,7 +7,9 @@ import 'package:go_router/go_router.dart';
 import '../../ludo_engine.dart' as board;
 import '../../ludo_screen.dart' show AAAProLudoBoardPainter;
 import '../../shared/widgets/game_ui.dart';
+import 'engine/ludo_ai.dart';
 import 'engine/ludo_engine.dart';
+import '../game_ai_difficulty.dart';
 
 const Map<LudoColor, Color> _playerColors = {
   LudoColor.red: Color(0xFFFF775F),
@@ -32,8 +35,13 @@ class LudoGameScreen extends StatefulWidget {
 class _LudoGameScreenState extends State<LudoGameScreen> {
   LudoGameState _game = LudoGameState.initial();
   String _message = 'ارمِ النرد لبدء دور اللاعب الأحمر';
+  bool _aiEnabled = false;
+  bool _aiBusy = false;
+  GameAiDifficulty _aiDifficulty = GameAiDifficulty.medium;
+  Timer? _aiTimer;
 
   List<LudoPiece> get _legalPieces {
+    if (_aiEnabled && _game.currentTurn != LudoColor.red) return const [];
     final die = _game.diceValue;
     if (die == null) return const [];
     return (_game.pieces[_game.currentTurn] ?? const <LudoPiece>[])
@@ -41,14 +49,78 @@ class _LudoGameScreenState extends State<LudoGameScreen> {
         .toList();
   }
 
+  void _scheduleAiTurn() {
+    if (!_aiEnabled ||
+        _aiBusy ||
+        _game.currentTurn == LudoColor.red ||
+        _game.winner != null) {
+      return;
+    }
+    _aiBusy = true;
+    _aiTimer = Timer(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
+      if (!_aiEnabled || _game.currentTurn == LudoColor.red || _game.winner != null) {
+        _aiBusy = false;
+        return;
+      }
+
+      var next = _game;
+      if (next.diceValue == null) {
+        next = LudoEngine.recordRoll(next, LudoEngine.rollDice());
+      }
+      if (next.diceValue == null) {
+        setState(() {
+          _game = next;
+          _message = 'ثلاثة أرقام ٦ متتالية؛ انتقل الدور إلى ${_playerNames[next.currentTurn]}';
+        });
+        _aiBusy = false;
+        _scheduleAiTurn();
+        return;
+      }
+
+      final die = next.diceValue!;
+      final pieceId = LudoAi.choosePiece(next, difficulty: _aiDifficulty);
+      if (pieceId == null) {
+        next = LudoEngine.skipIfNoLegalMove(next);
+        setState(() {
+          _game = next;
+          _message = 'لا توجد حركة قانونية بالرقم $die؛ الدور التالي ${_playerNames[next.currentTurn]}';
+        });
+      } else {
+        final aiColor = next.currentTurn;
+        next = LudoEngine.applyMove(next, aiColor, pieceId, die);
+        setState(() {
+          _game = next;
+          _message = next.winner == null
+              ? 'حرّك الذكاء الاصطناعي قطعة اللاعب ${_playerNames[aiColor]}'
+              : 'فاز اللاعب ${_playerNames[next.winner!]}!';
+        });
+      }
+      _aiBusy = false;
+      if (next.winner != null) _showWinner(next.winner!);
+      _scheduleAiTurn();
+    });
+  }
+
+  @override
+  void dispose() {
+    _aiTimer?.cancel();
+    super.dispose();
+  }
+
   void _rollDice() {
-    if (_game.diceValue != null || _game.winner != null) return;
+    if (_game.diceValue != null ||
+        _game.winner != null ||
+        (_aiEnabled && _game.currentTurn != LudoColor.red)) {
+      return;
+    }
     var next = LudoEngine.recordRoll(_game, LudoEngine.rollDice());
     if (next.diceValue == null) {
       setState(() {
         _game = next;
         _message = 'ثلاثة أرقام ٦ متتالية؛ انتقل الدور إلى ${_playerNames[next.currentTurn]}';
       });
+      _scheduleAiTurn();
       return;
     }
 
@@ -60,9 +132,11 @@ class _LudoGameScreenState extends State<LudoGameScreen> {
           ? 'لا توجد حركة قانونية بالرقم $rolledValue؛ الدور التالي ${_playerNames[next.currentTurn]}'
           : 'ظهر الرقم $rolledValue؛ اختر قطعة مضيئة للتحرك';
     });
+    _scheduleAiTurn();
   }
 
   void _movePiece(LudoPiece piece) {
+    if (_aiEnabled && _game.currentTurn != LudoColor.red) return;
     final die = _game.diceValue;
     if (die == null || !LudoEngine.isValidMove(_game, _game.currentTurn, piece.id, die)) return;
     final next = LudoEngine.applyMove(_game, _game.currentTurn, piece.id, die);
@@ -75,9 +149,12 @@ class _LudoGameScreenState extends State<LudoGameScreen> {
           : 'فاز اللاعب ${_playerNames[next.winner!]}!';
     });
     if (next.winner != null) _showWinner(next.winner!);
+    _scheduleAiTurn();
   }
 
   void _restart() {
+    _aiTimer?.cancel();
+    _aiBusy = false;
     setState(() {
       _game = LudoGameState.initial();
       _message = 'بدأت جولة جديدة؛ ارمِ النرد.';
@@ -105,7 +182,33 @@ class _LudoGameScreenState extends State<LudoGameScreen> {
         appBar: AppBar(
           title: const Text('لودو'),
           leading: IconButton(tooltip: 'إنهاء المباراة', onPressed: () => context.pop(), icon: const Icon(Icons.arrow_forward_rounded)),
-          actions: [IconButton(tooltip: 'إعادة المباراة', onPressed: _restart, icon: const Icon(Icons.refresh_rounded))],
+          actions: [
+            PopupMenuButton<String>(
+              tooltip: 'إعدادات الذكاء الاصطناعي',
+              onSelected: (value) {
+                setState(() {
+                  _aiEnabled = value != 'off';
+                  if (value == 'easy') _aiDifficulty = GameAiDifficulty.easy;
+                  if (value == 'medium') _aiDifficulty = GameAiDifficulty.medium;
+                  if (value == 'hard') _aiDifficulty = GameAiDifficulty.hard;
+                });
+                if (!_aiEnabled) {
+                  _aiTimer?.cancel();
+                  _aiBusy = false;
+                } else {
+                  _scheduleAiTurn();
+                }
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(value: 'off', child: Text('إيقاف الذكاء الاصطناعي')),
+                PopupMenuItem(value: 'easy', child: Text('ذكاء اصطناعي سهل')),
+                PopupMenuItem(value: 'medium', child: Text('ذكاء اصطناعي متوسط')),
+                PopupMenuItem(value: 'hard', child: Text('ذكاء اصطناعي صعب')),
+              ],
+              icon: Icon(_aiEnabled ? Icons.smart_toy_rounded : Icons.smart_toy_outlined),
+            ),
+            IconButton(tooltip: 'إعادة المباراة', onPressed: _restart, icon: const Icon(Icons.refresh_rounded)),
+          ],
         ),
         body: SafeArea(
           top: false,
@@ -179,7 +282,11 @@ class _LudoGameScreenState extends State<LudoGameScreen> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: _game.diceValue == null && _game.winner == null ? _rollDice : null,
+                        onPressed: _game.diceValue == null &&
+                                _game.winner == null &&
+                                (!_aiEnabled || _game.currentTurn == LudoColor.red)
+                            ? _rollDice
+                            : null,
                         icon: const Icon(Icons.casino_rounded),
                         label: const Text('ارمِ النرد'),
                       ),
