@@ -160,6 +160,7 @@ class GameLobbyHero extends StatelessWidget {
     required this.badge,
     required this.icon,
     required this.accent,
+    this.backgroundAsset,
   });
 
   final String title;
@@ -167,47 +168,79 @@ class GameLobbyHero extends StatelessWidget {
   final String badge;
   final IconData icon;
   final Color accent;
+  final String? backgroundAsset;
 
   @override
   Widget build(BuildContext context) => Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topRight,
-            end: Alignment.bottomLeft,
-            colors: [accent.withOpacity(0.2), panelRaised, panel],
-          ),
+          color: panel,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: accent.withOpacity(0.32)),
-          boxShadow: [BoxShadow(color: accent.withOpacity(0.07), blurRadius: 24, offset: const Offset(0, 8))],
+          border: Border.all(color: accent.withOpacity(0.42)),
+          boxShadow: [BoxShadow(color: accent.withOpacity(0.1), blurRadius: 25, offset: const Offset(0, 9))],
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 58,
-              height: 58,
-              decoration: BoxDecoration(color: accent.withOpacity(0.17), borderRadius: BorderRadius.circular(19)),
-              child: Icon(icon, color: accent, size: 30),
-            ),
-            const SizedBox(width: 15),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: Theme.of(context).textTheme.titleLarge),
-                  const SizedBox(height: 5),
-                  Text(subtitle, style: const TextStyle(color: mutedText, height: 1.4)),
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(color: accent.withOpacity(0.13), borderRadius: BorderRadius.circular(30)),
-                    child: Text(badge, style: TextStyle(color: accent, fontSize: 11, fontWeight: FontWeight.w800)),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(23),
+          child: Stack(
+            children: [
+              if (backgroundAsset != null)
+                Positioned.fill(
+                  child: ExcludeSemantics(
+                    child: Image.asset(
+                      backgroundAsset!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
                   ),
-                ],
+                ),
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.centerRight,
+                      end: Alignment.centerLeft,
+                      colors: [ink.withOpacity(0.97), ink.withOpacity(0.80), ink.withOpacity(0.24)],
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ],
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 58,
+                      height: 58,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(colors: [accent.withOpacity(0.28), panel]),
+                        borderRadius: BorderRadius.circular(19),
+                        border: Border.all(color: accent.withOpacity(0.65)),
+                        boxShadow: [BoxShadow(color: accent.withOpacity(0.2), blurRadius: 15)],
+                      ),
+                      child: Icon(icon, color: accent, size: 30),
+                    ),
+                    const SizedBox(width: 15),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(title, style: Theme.of(context).textTheme.titleLarge),
+                          const SizedBox(height: 5),
+                          Text(subtitle, style: const TextStyle(color: Color(0xFFE0E5ED), height: 1.4)),
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(color: ink.withOpacity(0.72), borderRadius: BorderRadius.circular(30), border: Border.all(color: accent.withOpacity(0.55))),
+                            child: Text(badge, style: TextStyle(color: accent, fontSize: 11, fontWeight: FontWeight.w800)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       );
 }

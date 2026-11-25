@@ -316,18 +316,28 @@ class _LudoGameScreenState extends State<LudoGameScreen> {
                                 width: 38,
                                 height: 38,
                                 decoration: BoxDecoration(
-                                  color: _diceFaceColor(_diceSkin.replaceFirst('ludo_dice_', '')),
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      Color.lerp(_diceFaceColor(_diceSkin.replaceFirst('ludo_dice_', '')), Colors.white, 0.26)!,
+                                      _diceFaceColor(_diceSkin.replaceFirst('ludo_dice_', '')),
+                                      Color.lerp(_diceFaceColor(_diceSkin.replaceFirst('ludo_dice_', '')), ink, 0.18)!,
+                                    ],
+                                  ),
                                   borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: _skinAccent(_diceSkin.replaceFirst('ludo_dice_', '')), width: 1.6),
+                                  border: Border.all(color: _skinAccent(_diceSkin.replaceFirst('ludo_dice_', '')).withOpacity(0.95), width: 1.6),
+                                  boxShadow: const [
+                                    BoxShadow(color: Colors.black45, blurRadius: 7, offset: Offset(0, 4)),
+                                    BoxShadow(color: Colors.white24, blurRadius: 1, offset: Offset(-1, -1)),
+                                  ],
                                 ),
                                 child: Center(
                                   child: _game.diceValue == null
                                       ? Icon(Icons.casino_rounded, color: _diceInk(_diceSkin.replaceFirst('ludo_dice_', '')), size: 24)
-                                      : Text(
-                                          '${_game.diceValue}',
-                                          style: TextStyle(color: _diceInk(_diceSkin.replaceFirst('ludo_dice_', '')), fontSize: 20, fontWeight: FontWeight.w900),
-                                        ),
+                                      : _DicePips(value: _game.diceValue!, color: _diceInk(_diceSkin.replaceFirst('ludo_dice_', ''))),
                                 ),
+
                               ),
                             ),
                             const SizedBox(width: 10),
@@ -362,6 +372,48 @@ class _LudoGameScreenState extends State<LudoGameScreen> {
               ),
             ],
           ),
+        ),
+      );
+}
+
+class _DicePips extends StatelessWidget {
+  const _DicePips({required this.value, required this.color});
+
+  static const Map<int, Set<int>> _positions = {
+    1: {4},
+    2: {0, 8},
+    3: {0, 4, 8},
+    4: {0, 2, 6, 8},
+    5: {0, 2, 4, 6, 8},
+    6: {0, 2, 3, 5, 6, 8},
+  };
+
+  final int value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.all(4),
+        child: Column(
+          children: List.generate(3, (row) => Expanded(
+            child: Row(
+              children: List.generate(3, (column) => Expanded(
+                child: Center(
+                  child: _positions[value]!.contains(row * 3 + column)
+                      ? Container(
+                          width: 4.5,
+                          height: 4.5,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                            boxShadow: [BoxShadow(color: color.withOpacity(0.32), blurRadius: 2)],
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              )),
+            ),
+          )),
         ),
       );
 }
@@ -636,13 +688,24 @@ class _LudoToken extends StatelessWidget {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
             decoration: BoxDecoration(
-              color: _playerColors[piece.color],
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color.lerp(_playerColors[piece.color]!, Colors.white, 0.46)!,
+                  _playerColors[piece.color]!,
+                  Color.lerp(_playerColors[piece.color]!, ink, 0.38)!,
+                ],
+              ),
               shape: BoxShape.circle,
               border: Border.all(
                 color: highlighted ? Colors.white : _skinAccent(appearanceStyle),
                 width: highlighted ? 2.5 : appearanceStyle == 'classic' ? 1.1 : 2,
               ),
-              boxShadow: [BoxShadow(color: _playerColors[piece.color]!.withOpacity(highlighted ? 0.62 : 0.27), blurRadius: highlighted ? 12 : 5, spreadRadius: highlighted ? 1 : 0)],
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.52), blurRadius: highlighted ? 9 : 5, offset: const Offset(0, 3)),
+                BoxShadow(color: _playerColors[piece.color]!.withOpacity(highlighted ? 0.7 : 0.32), blurRadius: highlighted ? 12 : 6, spreadRadius: highlighted ? 1 : 0),
+              ],
             ),
             child: Center(child: Text('${piece.index + 1}', style: const TextStyle(color: ink, fontSize: 9, fontWeight: FontWeight.w900))),
           ),

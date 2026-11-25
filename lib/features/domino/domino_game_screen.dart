@@ -582,7 +582,15 @@ class _DominoPipFace extends StatelessWidget {
                       ? Container(
                           width: dotSize,
                           height: dotSize,
-                          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [Color.lerp(color, Colors.white, 0.34)!, color, Color.lerp(color, Colors.black, 0.32)!],
+                            ),
+                            shape: BoxShape.circle,
+                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.28), blurRadius: 1.5, offset: const Offset(0, 1))],
+                          ),
                         )
                       : const SizedBox.shrink(),
                 ),
