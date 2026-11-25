@@ -35,6 +35,7 @@ List<Token> getInitialTokens() {
 }
 
 class LudoEngine {
+  static const int trackLength = 52;
   static const List<String> colors = ['red', 'green', 'yellow', 'blue'];
 
   static const Map<String, Color> colorValues = {
@@ -71,8 +72,8 @@ class LudoEngine {
   /// Returns null for base, home-lane, finished, or invalid positions.
   static int? getAbsoluteTrackPosition(String color, int pos) {
     final offset = startOffsets[color];
-    if (offset == null || pos < 0 || pos >= 52) return null;
-    return (offset + pos) % 52;
+    if (offset == null || pos < 0 || pos >= trackLength) return null;
+    return (offset + pos) % trackLength;
   }
 
   /// Precise coordinate mapping for the 15x15 board.
