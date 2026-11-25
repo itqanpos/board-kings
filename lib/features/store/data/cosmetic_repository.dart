@@ -32,7 +32,7 @@ class CosmeticRepository {
     final user = client.auth.currentUser;
     if (user == null) return StoreSnapshot(catalog: catalog, ownedIds: const {}, equipped: const {});
 
-    final responses = await Future.wait([
+    final responses = await Future.wait<dynamic>([
       client.from('player_wallets').select('balance').eq('user_id', user.id).maybeSingle(),
       client.from('player_inventory').select('item_id').eq('user_id', user.id),
       client.from('player_equipped_items').select('game_key,category,item_id').eq('user_id', user.id),

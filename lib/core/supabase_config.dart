@@ -9,10 +9,10 @@ class SupabaseConfig {
   static const _legacyAnonKeyOverride =
       String.fromEnvironment('SUPABASE_ANON_KEY');
 
-  static const url = _urlOverride.isNotEmpty
+  static final url = _urlOverride.isNotEmpty
       ? _urlOverride
       : 'https://jqxravimzpjqwerothph.supabase.co';
-  static const publishableKey = _publishableKeyOverride.isNotEmpty
+  static final publishableKey = _publishableKeyOverride.isNotEmpty
       ? _publishableKeyOverride
       : _legacyAnonKeyOverride.isNotEmpty
           ? _legacyAnonKeyOverride

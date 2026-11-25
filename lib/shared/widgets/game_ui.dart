@@ -67,8 +67,8 @@ ThemeData buildBoardKingsTheme() {
     pageTransitionsTheme: const PageTransitionsTheme(
       builders: {
         TargetPlatform.android: ZoomPageTransitionsBuilder(),
-        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-        TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.iOS: FadeUpwardsPageTransitionsBuilder(),
+        TargetPlatform.macOS: FadeUpwardsPageTransitionsBuilder(),
         TargetPlatform.windows: ZoomPageTransitionsBuilder(),
         TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
       },
