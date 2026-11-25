@@ -694,6 +694,7 @@ class _DominoDropTarget extends StatelessWidget {
           );
         },
       );
+}
 
 class _TurnSummary extends StatelessWidget {
   const _TurnSummary({required this.player, required this.message, required this.stock, required this.seconds});
