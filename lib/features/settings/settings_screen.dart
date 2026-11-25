@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../shared/widgets/game_ui.dart';
 
@@ -53,7 +54,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 18),
-            const Text('لا توجد حسابات أو إعدادات مزامنة في هذا الإصدار المحلي.', style: TextStyle(color: mutedText)),
+            SurfaceCard(
+              padding: EdgeInsets.zero,
+              child: ListTile(
+                leading: const Icon(Icons.person_outline_rounded, color: aqua),
+                title: const Text('حساب BOARD KINGS'),
+                subtitle: const Text('سجّل الدخول لمزامنة المظاهر ورصيد العملات.', style: TextStyle(color: mutedText, fontSize: 12)),
+                trailing: const Icon(Icons.chevron_left_rounded),
+                onTap: () => context.push('/account'),
+              ),
+            ),
           ],
         ),
       );

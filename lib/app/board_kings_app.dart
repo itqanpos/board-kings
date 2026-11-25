@@ -13,6 +13,8 @@ import '../features/ludo/ludo_game_screen.dart';
 import '../features/ludo/ludo_lobby_screen.dart';
 import '../features/profile/profile_screen.dart';
 import '../features/settings/settings_screen.dart';
+import '../features/store/cosmetic_store_screen.dart';
+import '../features/store/supabase_account_screen.dart';
 import '../shared/widgets/game_ui.dart';
 
 class BoardKingsApp extends StatefulWidget {
@@ -45,6 +47,8 @@ class _BoardKingsAppState extends State<BoardKingsApp> {
       GoRoute(path: '/profile', builder: (context, state) => const ProfileScreen()),
       GoRoute(path: '/settings', builder: (context, state) => const SettingsScreen()),
       GoRoute(path: '/friends', builder: (context, state) => const FriendsScreen()),
+      GoRoute(path: '/store', builder: (context, state) => const CosmeticStoreScreen()),
+      GoRoute(path: '/account', builder: (context, state) => const SupabaseAccountScreen()),
     ],
     errorBuilder: (context, state) => GameScaffold(
       title: 'تعذر فتح الصفحة',

@@ -301,9 +301,30 @@ class _LudoScreenState extends State<LudoScreen> {
 }
 
 class AAAProLudoBoardPainter extends CustomPainter {
+  const AAAProLudoBoardPainter({this.style = 'classic'});
+
+  final String style;
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..style = PaintingStyle.fill;
+    final surfaceColor = switch (style) {
+      'oak' => const Color(0xFF3A2D26),
+      'regal' => const Color(0xFF342824),
+      'neon' => const Color(0xFF112B37),
+      'galaxy' => const Color(0xFF211E3B),
+      'forest' => const Color(0xFF1B332B),
+      _ => const Color(0xFF171F2D),
+    };
+    final accentColor = switch (style) {
+      'oak' => const Color(0xFFD5B487),
+      'regal' => const Color(0xFFF4C66A),
+      'neon' => const Color(0xFF84F4FF),
+      'galaxy' => const Color(0xFFB7A6FF),
+      'forest' => const Color(0xFF8CE6A7),
+      _ => Colors.white,
+    };
+    canvas.drawRect(Offset.zero & size, paint..color = surfaceColor);
     double cellSize = size.width / 15;
 
     // 1. Draw Corner Bases with Premium Dark Tint
@@ -311,8 +332,8 @@ class AAAProLudoBoardPainter extends CustomPainter {
       paint.color = color.withOpacity(0.2);
       canvas.drawRect(Rect.fromLTWH(x * cellSize, y * cellSize, cellSize * 6, cellSize * 6), paint);
 
-      // Inner White Box for Bases
-      paint.color = const Color(0xFF1E1E2C);
+      // Keep the four player colors intact while styling the neutral base inset.
+      paint.color = surfaceColor.withOpacity(0.88);
       canvas.drawRRect(
         RRect.fromRectAndRadius(
           Rect.fromLTWH((x + 1) * cellSize, (y + 1) * cellSize, cellSize * 4, cellSize * 4),
@@ -336,7 +357,7 @@ class AAAProLudoBoardPainter extends CustomPainter {
     drawBase(9, 9, const Color(0xFF2979FF)); // Blue
 
     // 2. Draw Center Home Destination (Triangle Triad)
-    paint.color = const Color(0xFF1E1E2C);
+    paint.color = surfaceColor.withOpacity(0.92);
     canvas.drawRect(Rect.fromLTWH(cellSize * 6, cellSize * 6, cellSize * 3, cellSize * 3), paint);
 
     // Center triangles
@@ -374,7 +395,7 @@ class AAAProLudoBoardPainter extends CustomPainter {
 
     // 3. Draw Grid Lines & Borders with Neon Accent
     paint.style = PaintingStyle.stroke;
-    paint.color = Colors.white10;
+    paint.color = accentColor.withOpacity(style == 'classic' ? 0.08 : 0.2);
     paint.strokeWidth = 1;
     for (int i = 0; i <= 15; i++) {
       canvas.drawLine(Offset(i * cellSize, 0), Offset(i * cellSize, size.height), paint);
@@ -383,5 +404,5 @@ class AAAProLudoBoardPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant AAAProLudoBoardPainter oldDelegate) => oldDelegate.style != style;
 }
