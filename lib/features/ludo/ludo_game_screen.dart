@@ -1,31 +1,18 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/local_game_journal.dart';
-import '../../ludo_engine.dart' as board;
-import '../../ludo_screen.dart' show AAAProLudoBoardPainter;
-import '../../shared/widgets/game_ui.dart';
 import 'engine/ludo_ai.dart';
 import 'engine/ludo_engine.dart';
 import '../game_ai_difficulty.dart';
 import '../store/data/cosmetic_repository.dart';
-
-const Map<LudoColor, Color> _playerColors = {
-  LudoColor.red: Color(0xFFFF775F),
-  LudoColor.green: Color(0xFF6BD8C8),
-  LudoColor.yellow: Color(0xFFF4C66A),
-  LudoColor.blue: Color(0xFF789BFF),
-};
-
-const Map<LudoColor, String> _playerNames = {
-  LudoColor.red: 'الأحمر',
-  LudoColor.green: 'الأخضر',
-  LudoColor.yellow: 'الأصفر',
-  LudoColor.blue: 'الأزرق',
-};
+import 'widgets/ludo_board.dart';
+import 'widgets/ludo_match_controls.dart';
+import 'widgets/ludo_player_card.dart';
+import 'widgets/ludo_style.dart';
 
 class LudoGameScreen extends StatefulWidget {
   const LudoGameScreen({super.key});
@@ -36,11 +23,16 @@ class LudoGameScreen extends StatefulWidget {
 
 class _LudoGameScreenState extends State<LudoGameScreen> {
   LudoGameState _game = LudoGameState.initial();
-  String _message = 'ارمِ النرد لبدء دور اللاعب الأحمر';
+  String _message = 'ارمِ النرد لبدء دور اللاعب أحمد';
   bool _aiEnabled = false;
   bool _aiBusy = false;
+  bool _paused = false;
+  bool _soundEnabled = true;
   GameAiDifficulty _aiDifficulty = GameAiDifficulty.medium;
   Timer? _aiTimer;
+  Timer? _clockTimer;
+  final Stopwatch _roundClock = Stopwatch();
+  Duration _elapsed = Duration.zero;
   String _tableSkin = 'ludo_table_classic';
   String _diceSkin = 'ludo_dice_classic';
   String _piecesSkin = 'ludo_pieces_classic';
@@ -49,6 +41,11 @@ class _LudoGameScreenState extends State<LudoGameScreen> {
   void initState() {
     super.initState();
     _loadEquippedCosmetics();
+    _roundClock.start();
+    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || _paused) return;
+      setState(() => _elapsed = _roundClock.elapsed);
+    });
   }
 
   Future<void> _openCosmetics() async {
@@ -78,28 +75,21 @@ class _LudoGameScreenState extends State<LudoGameScreen> {
   }
 
   void _scheduleAiTurn() {
-    if (!_aiEnabled ||
-        _aiBusy ||
-        _game.currentTurn == LudoColor.red ||
-        _game.winner != null) {
-      return;
-    }
+    if (!_aiEnabled || _paused || _aiBusy || _game.currentTurn == LudoColor.red || _game.winner != null) return;
     _aiBusy = true;
-    _aiTimer = Timer(const Duration(milliseconds: 500), () {
+    _aiTimer = Timer(const Duration(milliseconds: 650), () {
       if (!mounted) return;
-      if (!_aiEnabled || _game.currentTurn == LudoColor.red || _game.winner != null) {
+      if (!_aiEnabled || _paused || _game.currentTurn == LudoColor.red || _game.winner != null) {
         _aiBusy = false;
         return;
       }
 
       var next = _game;
-      if (next.diceValue == null) {
-        next = LudoEngine.recordRoll(next, LudoEngine.rollDice());
-      }
+      if (next.diceValue == null) next = LudoEngine.recordRoll(next, LudoEngine.rollDice());
       if (next.diceValue == null) {
         setState(() {
           _game = next;
-          _message = 'ثلاثة أرقام ٦ متتالية؛ انتقل الدور إلى ${_playerNames[next.currentTurn]}';
+          _message = 'ثلاثة أرقام ٦ متتالية؛ انتقل الدور إلى ${ludoPlayerNames[next.currentTurn]}';
         });
         _aiBusy = false;
         _scheduleAiTurn();
@@ -112,7 +102,7 @@ class _LudoGameScreenState extends State<LudoGameScreen> {
         next = LudoEngine.skipIfNoLegalMove(next);
         setState(() {
           _game = next;
-          _message = 'لا توجد حركة قانونية بالرقم $die؛ الدور التالي ${_playerNames[next.currentTurn]}';
+          _message = 'لا توجد حركة قانونية بالرقم $die؛ الدور التالي ${ludoPlayerNames[next.currentTurn]}';
         });
       } else {
         final aiColor = next.currentTurn;
@@ -120,8 +110,8 @@ class _LudoGameScreenState extends State<LudoGameScreen> {
         setState(() {
           _game = next;
           _message = next.winner == null
-              ? 'حرّك الذكاء الاصطناعي قطعة اللاعب ${_playerNames[aiColor]}'
-              : 'فاز اللاعب ${_playerNames[next.winner!]}!';
+              ? 'حرّك الذكاء الاصطناعي قطعة اللاعب ${ludoPlayerNames[aiColor]}'
+              : 'فاز اللاعب ${ludoPlayerNames[next.winner!]}!';
         });
       }
       _aiBusy = false;
@@ -133,20 +123,22 @@ class _LudoGameScreenState extends State<LudoGameScreen> {
   @override
   void dispose() {
     _aiTimer?.cancel();
+    _clockTimer?.cancel();
     super.dispose();
   }
 
+  void _playClick() {
+    if (_soundEnabled) SystemSound.play(SystemSoundType.click);
+  }
+
   void _rollDice() {
-    if (_game.diceValue != null ||
-        _game.winner != null ||
-        (_aiEnabled && _game.currentTurn != LudoColor.red)) {
-      return;
-    }
+    if (_game.diceValue != null || _game.winner != null || (_aiEnabled && _game.currentTurn != LudoColor.red)) return;
+    _playClick();
     var next = LudoEngine.recordRoll(_game, LudoEngine.rollDice());
     if (next.diceValue == null) {
       setState(() {
         _game = next;
-        _message = 'ثلاثة أرقام ٦ متتالية؛ انتقل الدور إلى ${_playerNames[next.currentTurn]}';
+        _message = 'ثلاثة أرقام ٦ متتالية؛ انتقل الدور إلى ${ludoPlayerNames[next.currentTurn]}';
       });
       _scheduleAiTurn();
       return;
@@ -157,7 +149,7 @@ class _LudoGameScreenState extends State<LudoGameScreen> {
     setState(() {
       _game = next;
       _message = next.diceValue == null
-          ? 'لا توجد حركة قانونية بالرقم $rolledValue؛ الدور التالي ${_playerNames[next.currentTurn]}'
+          ? 'لا توجد حركة قانونية بالرقم $rolledValue؛ الدور التالي ${ludoPlayerNames[next.currentTurn]}'
           : 'ظهر الرقم $rolledValue؛ اختر قطعة مضيئة للتحرك';
     });
     _scheduleAiTurn();
@@ -167,14 +159,15 @@ class _LudoGameScreenState extends State<LudoGameScreen> {
     if (_aiEnabled && _game.currentTurn != LudoColor.red) return;
     final die = _game.diceValue;
     if (die == null || !LudoEngine.isValidMove(_game, _game.currentTurn, piece.id, die)) return;
+    _playClick();
     final next = LudoEngine.applyMove(_game, _game.currentTurn, piece.id, die);
     setState(() {
       _game = next;
       _message = next.winner == null
           ? (next.currentTurn == piece.color
               ? 'حركة موفقة؛ لديك دور إضافي. ارمِ النرد مجدداً.'
-              : 'انتهى الدور؛ اللاعب ${_playerNames[next.currentTurn]} يلعب الآن.')
-          : 'فاز اللاعب ${_playerNames[next.winner!]}!';
+              : 'انتهى الدور؛ اللاعب ${ludoPlayerNames[next.currentTurn]} يلعب الآن.')
+          : 'فاز اللاعب ${ludoPlayerNames[next.winner!]}!';
     });
     if (next.winner != null) _showWinner(next.winner!);
     _scheduleAiTurn();
@@ -186,24 +179,155 @@ class _LudoGameScreenState extends State<LudoGameScreen> {
     setState(() {
       _game = LudoGameState.initial();
       _message = 'بدأت جولة جديدة؛ ارمِ النرد.';
+      _roundClock..reset()..start();
+      _elapsed = Duration.zero;
     });
+  }
+
+  Future<void> _pauseGame() async {
+    if (_game.winner != null) return;
+    _aiTimer?.cancel();
+    _aiBusy = false;
+    _roundClock.stop();
+    setState(() => _paused = true);
+    final action = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: ludoPanel,
+        title: const Text('اللعبة متوقفة مؤقتاً', textAlign: TextAlign.center, style: TextStyle(color: ludoCream, fontWeight: FontWeight.w900)),
+        content: const Text('استرح قليلاً، وستبقى جولتك محفوظة هنا.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70)),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, 'resume'), child: const Text('متابعة اللعب')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext, 'restart'), child: const Text('جولة جديدة')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext, 'exit'), child: const Text('إنهاء المباراة')),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _paused = false);
+    if (action == 'restart') {
+      _restart();
+    } else if (action == 'exit') {
+      context.pop();
+    } else {
+      _roundClock.start();
+      _scheduleAiTurn();
+    }
+  }
+
+  Future<void> _showQuickChat() async {
+    const messages = ['حظاً موفقاً!', 'أحسنت الحركة', 'اقتربت من الفوز', 'جولة ممتعة'];
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: ludoPanel,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            const Text('رسالة سريعة', textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: ludoCream)),
+            const SizedBox(height: 14),
+            for (final message in messages)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 7),
+                child: OutlinedButton(onPressed: () => Navigator.pop(sheetContext, message), child: Text(message)),
+              ),
+          ]),
+        ),
+      ),
+    );
+    if (selected == null || !mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text('${ludoPlayerNames[_game.currentTurn]}: $selected'), behavior: SnackBarBehavior.floating, duration: const Duration(seconds: 2)));
+  }
+
+  Future<void> _showSettings() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: ludoPanel,
+      showDragHandle: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, refreshSheet) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 4, 18, 22),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              const Text('إعدادات الجولة', textAlign: TextAlign.center, style: TextStyle(color: ludoCream, fontSize: 19, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 10),
+              SwitchListTile.adaptive(
+                value: _aiEnabled,
+                activeColor: ludoGold,
+                title: const Text('اللعب ضد الذكاء الاصطناعي'),
+                subtitle: const Text('أنت اللاعب الأحمر؛ بقية الألوان يتحكم بها الحاسوب.'),
+                onChanged: (enabled) {
+                  setState(() {
+                    _aiEnabled = enabled;
+                    if (!enabled) {
+                      _aiTimer?.cancel();
+                      _aiBusy = false;
+                    }
+                  });
+                  refreshSheet(() {});
+                  if (enabled) _scheduleAiTurn();
+                },
+              ),
+              if (_aiEnabled) ...[
+                const SizedBox(height: 4),
+                const Text('مستوى الصعوبة', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                SegmentedButton<GameAiDifficulty>(
+                  showSelectedIcon: false,
+                  segments: const [
+                    ButtonSegment(value: GameAiDifficulty.easy, label: Text('سهل')),
+                    ButtonSegment(value: GameAiDifficulty.medium, label: Text('متوسط')),
+                    ButtonSegment(value: GameAiDifficulty.hard, label: Text('صعب')),
+                  ],
+                  selected: {_aiDifficulty},
+                  onSelectionChanged: (selection) {
+                    setState(() => _aiDifficulty = selection.first);
+                    refreshSheet(() {});
+                  },
+                ),
+              ],
+              const SizedBox(height: 10),
+              OutlinedButton.icon(onPressed: () { Navigator.pop(sheetContext); _openCosmetics(); }, icon: const Icon(Icons.storefront_rounded), label: const Text('المظاهر والأحجار')),
+              TextButton.icon(onPressed: () { Navigator.pop(sheetContext); _restart(); }, icon: const Icon(Icons.refresh_rounded), label: const Text('بدء جولة جديدة')),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showPlayerInfo(LudoColor color) {
+    final pieces = _game.pieces[color] ?? const <LudoPiece>[];
+    final finished = pieces.where((piece) => piece.position == LudoEngine.finishPosition).length;
+    final onTrack = pieces.where((piece) => piece.position >= 0 && piece.position < LudoEngine.finishPosition).length;
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: ludoPanel,
+        title: Text(ludoPlayerNames[color]!, textAlign: TextAlign.center, style: TextStyle(color: ludoPlayerColors[color], fontWeight: FontWeight.w900)),
+        content: Text('قطع في المسار: $onTrack\nقطع وصلت للنهاية: $finished من 4', textAlign: TextAlign.center, style: const TextStyle(height: 1.7)),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إغلاق'))],
+      ),
+    );
   }
 
   void _showWinner(LudoColor winner) {
     unawaited(
-      LocalGameJournal.recordResult(
-        game: 'ludo',
-        playerCount: LudoColor.values.length,
-        winner: _playerNames[winner]!,
-      ).catchError((Object _) {}),
+      LocalGameJournal.recordResult(game: 'ludo', playerCount: LudoColor.values.length, winner: ludoPlayerNames[winner]!).catchError((Object _) {}),
     );
     showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: panel,
+        backgroundColor: ludoPanel,
         title: const Text('انتهت الجولة'),
-        content: Text('الفائز هو ${_playerNames[winner]}.', textAlign: TextAlign.center),
+        content: Text('الفائز هو ${ludoPlayerNames[winner]}.', textAlign: TextAlign.center),
         actions: [
           TextButton(onPressed: () { Navigator.pop(dialogContext); _restart(); }, child: const Text('جولة جديدة')),
           TextButton(onPressed: () { Navigator.pop(dialogContext); context.pop(); }, child: const Text('إنهاء')),
@@ -212,505 +336,157 @@ class _LudoGameScreenState extends State<LudoGameScreen> {
     );
   }
 
+  String get _timerText {
+    final minutes = _elapsed.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = _elapsed.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
+
+  int _finishedCount(LudoColor color) => _game.pieces[color]!.where((piece) => piece.position == LudoEngine.finishPosition).length;
+
+  int _progressPoints(LudoColor color) => _game.pieces[color]!.fold<int>(
+        0,
+        (points, piece) => points + (piece.position < 0 ? 0 : piece.position + 1),
+      );
+
+  Widget _buildBoard(double maxWidth, double maxHeight) {
+    final side = maxWidth < 1 || maxHeight < 1 ? 0.0 : maxWidth.clamp(0.0, maxHeight).clamp(0.0, 620.0).toDouble();
+    return Center(
+      child: SizedBox.square(
+        dimension: side,
+        child: LudoBoardView(
+          game: _game,
+          legalPieceIds: _legalPieces.map((piece) => piece.id).toSet(),
+          onPieceTap: _movePiece,
+          tableSkin: _tableSkin,
+          piecesSkin: _piecesSkin,
+        ),
+      ),
+    );
+  }
+
+  Widget _playerCard(LudoColor color, {bool compact = false}) => LudoPlayerCard(
+        color: color,
+        active: color == _game.currentTurn,
+        finishedPieces: _finishedCount(color),
+        points: _progressPoints(color),
+        isAi: _aiEnabled && color != LudoColor.red,
+        compact: compact,
+        onTap: () => _showPlayerInfo(color),
+      );
+
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(
-          title: const Text('لودو'),
-          leading: IconButton(tooltip: 'إنهاء المباراة', onPressed: () => context.pop(), icon: const Icon(Icons.arrow_forward_rounded)),
-          actions: [
-            IconButton(
-              tooltip: 'المظاهر',
-              onPressed: _openCosmetics,
-              icon: const Icon(Icons.storefront_rounded),
-            ),
-            PopupMenuButton<String>(
-              tooltip: 'إعدادات الذكاء الاصطناعي',
-              onSelected: (value) {
-                setState(() {
-                  _aiEnabled = value != 'off';
-                  if (value == 'easy') _aiDifficulty = GameAiDifficulty.easy;
-                  if (value == 'medium') _aiDifficulty = GameAiDifficulty.medium;
-                  if (value == 'hard') _aiDifficulty = GameAiDifficulty.hard;
-                });
-                if (!_aiEnabled) {
-                  _aiTimer?.cancel();
-                  _aiBusy = false;
-                } else {
-                  _scheduleAiTurn();
-                }
-              },
-              itemBuilder: (context) => const [
-                PopupMenuItem(value: 'off', child: Text('إيقاف الذكاء الاصطناعي')),
-                PopupMenuItem(value: 'easy', child: Text('ذكاء اصطناعي سهل')),
-                PopupMenuItem(value: 'medium', child: Text('ذكاء اصطناعي متوسط')),
-                PopupMenuItem(value: 'hard', child: Text('ذكاء اصطناعي صعب')),
-              ],
-              icon: Icon(_aiEnabled ? Icons.smart_toy_rounded : Icons.smart_toy_outlined),
-            ),
-            IconButton(tooltip: 'إعادة المباراة', onPressed: _restart, icon: const Icon(Icons.refresh_rounded)),
-          ],
-        ),
-        body: SafeArea(
-          top: false,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 3, 16, 9),
-                child: Column(
-                  children: [
-                    _PlayerTurnBar(current: _game.currentTurn, message: _message),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: LudoColor.values.map((color) => Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 3),
-                          child: _PlayerPill(
-                            color: color,
-                            active: color == _game.currentTurn,
-                            progress: _game.pieces[color]!.where((piece) => piece.position == LudoEngine.finishPosition).length,
-                          ),
-                        ),
-                      )).toList(),
+        backgroundColor: ludoInk,
+        body: Stack(
+          children: [
+            const Positioned.fill(child: _LudoRoomBackdrop()),
+            SafeArea(
+              child: Column(
+                children: [
+                  LudoTopBar(
+                    currentTurn: _game.currentTurn,
+                    timer: _timerText,
+                    soundEnabled: _soundEnabled,
+                    onPause: _pauseGame,
+                    onToggleSound: () {
+                      setState(() => _soundEnabled = !_soundEnabled);
+                      _playClick();
+                    },
+                    onChat: _showQuickChat,
+                    onSettings: _showSettings,
+                  ),
+                  Container(
+                    height: 29,
+                    margin: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: ludoPanel.withOpacity(0.82), borderRadius: BorderRadius.circular(14), border: Border.all(color: ludoGold.withOpacity(0.16))),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      child: Text(_message, key: ValueKey(_message), maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(color: ludoCream, fontSize: 11, fontWeight: FontWeight.w700)),
                     ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final side = math.min(math.min(constraints.maxWidth, constraints.maxHeight), 500.0);
-                    return Center(
-                      child: SizedBox.square(
-                        dimension: side,
-                        child: _LudoBoard(
-                          game: _game,
-                          legalPieceIds: _legalPieces.map((piece) => piece.id).toSet(),
-                          onPieceTap: _movePiece,
-                          tableSkin: _tableSkin,
-                          piecesSkin: _piecesSkin,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 9, 16, 16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.all(13),
-                        decoration: BoxDecoration(
-                          color: panel,
-                          borderRadius: BorderRadius.circular(17),
-                          border: Border.all(color: _skinAccent(_diceSkin.replaceFirst('ludo_dice_', '')).withOpacity(0.55)),
-                        ),
-                        child: Row(
-                          children: [
-                            AnimatedRotation(
-                              turns: _game.diceValue == null ? 0 : _game.diceValue! / 6,
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeOutBack,
-                              child: Container(
-                                width: 38,
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      Color.lerp(_diceFaceColor(_diceSkin.replaceFirst('ludo_dice_', '')), Colors.white, 0.26)!,
-                                      _diceFaceColor(_diceSkin.replaceFirst('ludo_dice_', '')),
-                                      Color.lerp(_diceFaceColor(_diceSkin.replaceFirst('ludo_dice_', '')), ink, 0.18)!,
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: _skinAccent(_diceSkin.replaceFirst('ludo_dice_', '')).withOpacity(0.95), width: 1.6),
-                                  boxShadow: const [
-                                    BoxShadow(color: Colors.black45, blurRadius: 7, offset: Offset(0, 4)),
-                                    BoxShadow(color: Colors.white24, blurRadius: 1, offset: Offset(-1, -1)),
-                                  ],
-                                ),
-                                child: Center(
-                                  child: _game.diceValue == null
-                                      ? Icon(Icons.casino_rounded, color: _diceInk(_diceSkin.replaceFirst('ludo_dice_', '')), size: 24)
-                                      : _DicePips(value: _game.diceValue!, color: _diceInk(_diceSkin.replaceFirst('ludo_dice_', ''))),
-                                ),
-
-                              ),
+                  ),
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final wide = constraints.maxWidth > 760 && constraints.maxWidth > constraints.maxHeight * 1.18;
+                        if (wide) {
+                          return Padding(
+                            padding: const EdgeInsets.fromLTRB(14, 11, 14, 9),
+                            child: Row(
+                              children: [
+                                SizedBox(width: 154, child: Column(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [_playerCard(LudoColor.red), _playerCard(LudoColor.yellow)])),
+                                const SizedBox(width: 12),
+                                Expanded(child: LayoutBuilder(builder: (context, boardConstraints) => _buildBoard(boardConstraints.maxWidth, boardConstraints.maxHeight))),
+                                const SizedBox(width: 12),
+                                SizedBox(width: 154, child: Column(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [_playerCard(LudoColor.green), _playerCard(LudoColor.blue)])),
+                              ],
                             ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 220),
-                                child: Text(
-                                  _game.diceValue == null ? 'النرد جاهز' : 'النتيجة ${_game.diceValue}',
-                                  key: ValueKey<int?>(_game.diceValue),
-                                  style: const TextStyle(fontWeight: FontWeight.w800),
-                                ),
+                          );
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.fromLTRB(11, 9, 11, 5),
+                          child: Column(
+                            children: [
+                              GridView.count(
+                                crossAxisCount: 2,
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                mainAxisSpacing: 7,
+                                crossAxisSpacing: 7,
+                                childAspectRatio: constraints.maxWidth < 360 ? 2.25 : 2.55,
+                                children: LudoColor.values.map((color) => _playerCard(color, compact: true)).toList(),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _game.diceValue == null &&
-                                _game.winner == null &&
-                                (!_aiEnabled || _game.currentTurn == LudoColor.red)
-                            ? _rollDice
-                            : null,
-                        icon: const Icon(Icons.casino_rounded),
-                        label: const Text('ارمِ النرد'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-}
-
-class _DicePips extends StatelessWidget {
-  const _DicePips({required this.value, required this.color});
-
-  static const Map<int, Set<int>> _positions = {
-    1: {4},
-    2: {0, 8},
-    3: {0, 4, 8},
-    4: {0, 2, 6, 8},
-    5: {0, 2, 4, 6, 8},
-    6: {0, 2, 3, 5, 6, 8},
-  };
-
-  final int value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.all(4),
-        child: Column(
-          children: List.generate(3, (row) => Expanded(
-            child: Row(
-              children: List.generate(3, (column) => Expanded(
-                child: Center(
-                  child: _positions[value]!.contains(row * 3 + column)
-                      ? Container(
-                          width: 4.5,
-                          height: 4.5,
-                          decoration: BoxDecoration(
-                            color: color,
-                            shape: BoxShape.circle,
-                            boxShadow: [BoxShadow(color: color.withOpacity(0.32), blurRadius: 2)],
+                              const SizedBox(height: 6),
+                              Expanded(child: LayoutBuilder(builder: (context, boardConstraints) => _buildBoard(boardConstraints.maxWidth, boardConstraints.maxHeight))),
+                            ],
                           ),
-                        )
-                      : const SizedBox.shrink(),
-                ),
-              )),
-            ),
-          )),
-        ),
-      );
-}
-
-class _PlayerTurnBar extends StatelessWidget {
-  const _PlayerTurnBar({required this.current, required this.message});
-  final LudoColor current;
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = _playerColors[current]!;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 240),
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.centerRight,
-          end: Alignment.centerLeft,
-          colors: [accent.withOpacity(0.18), panel],
-        ),
-        borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: accent.withOpacity(0.48)),
-        boxShadow: [BoxShadow(color: accent.withOpacity(0.08), blurRadius: 18)],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: accent.withOpacity(0.18),
-              shape: BoxShape.circle,
-              border: Border.all(color: accent.withOpacity(0.7)),
-            ),
-            child: Icon(Icons.person_rounded, color: accent, size: 23),
-          ),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text('دور ${_playerNames[current]}', style: TextStyle(color: accent, fontSize: 13, fontWeight: FontWeight.w900)),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                      decoration: BoxDecoration(color: accent.withOpacity(0.14), borderRadius: BorderRadius.circular(20)),
-                      child: Text('يلعب الآن', style: TextStyle(color: accent, fontSize: 10, fontWeight: FontWeight.w800)),
+                        );
+                      },
                     ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
-                  child: Text(
-                    message,
-                    key: ValueKey(message),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 11, color: mutedText),
                   ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PlayerPill extends StatelessWidget {
-  const _PlayerPill({required this.color, required this.active, required this.progress});
-  final LudoColor color;
-  final bool active;
-  final int progress;
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = _playerColors[color]!;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOut,
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 8),
-      decoration: BoxDecoration(
-        gradient: active
-            ? LinearGradient(colors: [accent.withOpacity(0.2), panel])
-            : null,
-        color: active ? null : panel.withOpacity(0.88),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: active ? accent.withOpacity(0.85) : Colors.white.withOpacity(0.045), width: active ? 1.4 : 1),
-        boxShadow: active ? [BoxShadow(color: accent.withOpacity(0.1), blurRadius: 12)] : null,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(width: 8, height: 8, decoration: BoxDecoration(color: accent, shape: BoxShape.circle, boxShadow: [BoxShadow(color: accent.withOpacity(0.55), blurRadius: 6)])),
-              const SizedBox(width: 5),
-              Flexible(child: Text(_playerNames[color]!, overflow: TextOverflow.ellipsis, style: TextStyle(color: active ? accent : Colors.white, fontSize: 10, fontWeight: FontWeight.w800))),
-            ],
-          ),
-          const SizedBox(height: 5),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(progress == 4 ? Icons.emoji_events_rounded : Icons.flag_rounded, size: 11, color: progress == 4 ? gold : mutedText),
-              const SizedBox(width: 3),
-              Text('$progress من 4', style: TextStyle(fontSize: 10, color: active ? Colors.white : mutedText, fontWeight: FontWeight.w700)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LudoBoard extends StatelessWidget {
-  const _LudoBoard({required this.game, required this.legalPieceIds, required this.onPieceTap, required this.tableSkin, required this.piecesSkin});
-  final LudoGameState game;
-  final Set<String> legalPieceIds;
-  final ValueChanged<LudoPiece> onPieceTap;
-  final String tableSkin;
-  final String piecesSkin;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF293A50), panel, Color(0xFF121D2C)],
-        ),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: _skinAccent(tableSkin.replaceFirst('ludo_table_', '')).withOpacity(0.8), width: 2),
-        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 22, offset: Offset(0, 9))],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(19),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final cell = constraints.maxWidth / 15;
-            final pieces = game.pieces.values.expand((playerPieces) => playerPieces).toList();
-            return Stack(
-              children: [
-                Positioned.fill(
-                  child: CustomPaint(
-                    painter: AAAProLudoBoardPainter(style: tableSkin.replaceFirst('ludo_table_', '')),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
+                    child: Row(
+                      children: [
+                        LudoQuickActionButton(icon: Icons.storefront_rounded, label: 'مظاهر اللعبة', onPressed: _openCosmetics),
+                        const SizedBox(width: 10),
+                        Expanded(child: LudoRollButton(value: _game.diceValue, enabled: _game.diceValue == null && _game.winner == null && (!_aiEnabled || _game.currentTurn == LudoColor.red), onPressed: _rollDice, skin: _diceSkin)),
+                        const SizedBox(width: 10),
+                        LudoQuickActionButton(icon: Icons.info_outline_rounded, label: 'حالة الجولة', onPressed: () => _showPlayerInfo(_game.currentTurn)),
+                      ],
+                    ),
                   ),
-                ),
-                for (final piece in pieces)
-                  _LudoToken(
-                    piece: piece,
-                    cell: cell,
-                    highlighted: legalPieceIds.contains(piece.id),
-                    onTap: () => onPieceTap(piece),
-                    stackIndex: _stackIndex(piece, pieces),
-                    stackSize: _piecesAtSameVisualSquare(piece, pieces).length,
-                    appearanceStyle: piecesSkin.replaceFirst('ludo_pieces_', ''),
-                  ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-List<LudoPiece> _piecesAtSameVisualSquare(LudoPiece piece, List<LudoPiece> pieces) {
-  final matching = pieces.where((candidate) {
-    if (piece.position == -1 || candidate.position == -1) {
-      return piece.id == candidate.id;
-    }
-    if (piece.position < board.LudoEngine.trackLength &&
-        candidate.position < board.LudoEngine.trackLength) {
-      return board.LudoEngine.getAbsoluteTrackPosition(
-            piece.color.name,
-            piece.position,
-          ) ==
-          board.LudoEngine.getAbsoluteTrackPosition(
-            candidate.color.name,
-            candidate.position,
-          );
-    }
-    if (piece.position == 58 || candidate.position == 58) {
-      return piece.position == 58 && candidate.position == 58;
-    }
-    return piece.color == candidate.color && piece.position == candidate.position;
-  }).toList()
-    ..sort((a, b) {
-      final colorOrder = a.color.index.compareTo(b.color.index);
-      return colorOrder != 0 ? colorOrder : a.index.compareTo(b.index);
-    });
-  return matching;
-}
-
-int _stackIndex(LudoPiece piece, List<LudoPiece> pieces) =>
-    _piecesAtSameVisualSquare(piece, pieces).indexWhere((candidate) => candidate.id == piece.id);
-
-Color _diceFaceColor(String style) => switch (style) {
-      'gold' || 'crown' => const Color(0xFFF4C66A),
-      'crystal' => const Color(0xFFB8EAEB),
-      'flame' => const Color(0xFF9C4936),
-      'neon' => const Color(0xFF153D4D),
-      _ => const Color(0xFF354962),
-    };
-
-Color _diceInk(String style) => switch (style) {
-      'gold' || 'crown' || 'crystal' => ink,
-      _ => const Color(0xFFF7F4ED),
-    };
-
-Color _skinAccent(String style) => switch (style) {
-      'gold' || 'crown' || 'regal' => gold,
-      'crystal' => const Color(0xFF9CEBEB),
-      'neon' => const Color(0xFF84F4FF),
-      'flame' => const Color(0xFFFFA16B),
-      'galaxy' => const Color(0xFFB7A6FF),
-      'oak' || 'desert' || 'ivory' => const Color(0xFFD5B487),
-      'forest' => const Color(0xFF8CE6A7),
-      _ => aqua,
-    };
-
-class _LudoToken extends StatelessWidget {
-  const _LudoToken({
-    required this.piece,
-    required this.cell,
-    required this.highlighted,
-    required this.onTap,
-    required this.stackIndex,
-    required this.stackSize,
-    required this.appearanceStyle,
-  });
-  final LudoPiece piece;
-  final double cell;
-  final bool highlighted;
-  final VoidCallback onTap;
-  final int stackIndex;
-  final int stackSize;
-  final String appearanceStyle;
-
-  @override
-  Widget build(BuildContext context) {
-    final point = board.LudoEngine.getTokenCoords(
-      piece.color.name,
-      piece.position,
-      piece.index,
-      stackIndex: stackIndex,
-      stackSize: stackSize,
-    );
-    final size = cell * (stackSize == 1 ? 0.84 : 0.84 / math.sqrt(stackSize).ceil());
-    return AnimatedPositioned(
-      duration: const Duration(milliseconds: 320),
-      curve: Curves.easeOutCubic,
-      left: point[0] * cell + (cell - size) / 2,
-      top: point[1] * cell + (cell - size) / 2,
-      width: size,
-      height: size,
-      child: Semantics(
-        button: highlighted,
-        label: '${_playerNames[piece.color]}، قطعة ${piece.index + 1}${highlighted ? '، حركة قانونية' : ''}',
-        child: GestureDetector(
-          onTap: highlighted ? onTap : null,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color.lerp(_playerColors[piece.color]!, Colors.white, 0.46)!,
-                  _playerColors[piece.color]!,
-                  Color.lerp(_playerColors[piece.color]!, ink, 0.38)!,
                 ],
               ),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: highlighted ? Colors.white : _skinAccent(appearanceStyle),
-                width: highlighted ? 2.5 : appearanceStyle == 'classic' ? 1.1 : 2,
-              ),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.52), blurRadius: highlighted ? 9 : 5, offset: const Offset(0, 3)),
-                BoxShadow(color: _playerColors[piece.color]!.withOpacity(highlighted ? 0.7 : 0.32), blurRadius: highlighted ? 12 : 6, spreadRadius: highlighted ? 1 : 0),
-              ],
             ),
-            child: Center(child: Text('${piece.index + 1}', style: const TextStyle(color: ink, fontSize: 9, fontWeight: FontWeight.w900))),
-          ),
+          ],
         ),
-      ),
-    );
+      );
+}
+
+class _LudoRoomBackdrop extends StatelessWidget {
+  const _LudoRoomBackdrop();
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(center: Alignment(0, -0.3), radius: 1.2, colors: [Color(0xFF3A281E), Color(0xFF19131A), ludoInk]),
+        ),
+        child: CustomPaint(painter: _BackdropGlowPainter(), child: const SizedBox.expand()),
+      );
+}
+
+class _BackdropGlowPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final glow = Paint()..shader = RadialGradient(colors: [ludoGold.withOpacity(0.1), Colors.transparent]).createShader(Rect.fromCircle(center: Offset(size.width / 2, size.height * 0.42), radius: size.shortestSide * 0.75));
+    canvas.drawRect(Offset.zero & size, glow);
+    final edgePaint = Paint()..style = PaintingStyle.stroke..strokeWidth = 1..color = ludoGold.withOpacity(0.075);
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(8, 8, size.width - 16, size.height - 16), const Radius.circular(20)), edgePaint);
   }
+
+  @override
+  bool shouldRepaint(covariant _BackdropGlowPainter oldDelegate) => false;
 }

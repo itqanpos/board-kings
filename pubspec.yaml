@@ -28,3 +28,7 @@ flutter:
   assets:
     - assets/images/ludo_lounge.webp
     - assets/images/domino_lounge.webp
+    - assets/images/avatars/ahmed.png
+    - assets/images/avatars/sara.png
+    - assets/images/avatars/mohammed.png
+    - assets/images/avatars/ali.png
