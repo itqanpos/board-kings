@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'app/board_kings_app.dart';
+import 'core/supabase_config.dart';
 
-void main() => runApp(const BoardKingsApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await SupabaseConfig.initialize();
+  runApp(const BoardKingsApp());
+}

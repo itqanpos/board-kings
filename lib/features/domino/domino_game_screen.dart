@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../shared/widgets/game_ui.dart';
 import '../game_ai_difficulty.dart';
+import '../store/data/cosmetic_repository.dart';
 import 'engine/domino_ai.dart';
 import 'engine/domino_engine.dart';
 
@@ -26,12 +27,31 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
   bool _aiBusy = false;
   GameAiDifficulty _aiDifficulty = GameAiDifficulty.medium;
   Timer? _aiTimer;
+  String _tableSkin = 'domino_table_classic';
+  String _tilesSkin = 'domino_tiles_classic';
 
   @override
   void initState() {
     super.initState();
     _game = DominoGameState.initial(widget.playerCount, random: Random.secure());
     _message = 'اللاعب ${_game.currentTurnPlayer + 1} يبدأ بالقطعة الافتتاحية';
+    _loadEquippedCosmetics();
+  }
+
+  Future<void> _openCosmetics() async {
+    await context.push('/store');
+    if (mounted) await _loadEquippedCosmetics();
+  }
+
+  Future<void> _loadEquippedCosmetics() async {
+    try {
+      final items = await CosmeticRepository.loadEquipment('domino');
+      if (!mounted) return;
+      setState(() {
+        _tableSkin = items['table'] ?? _tableSkin;
+        _tilesSkin = items['tiles'] ?? _tilesSkin;
+      });
+    } catch (_) {}
   }
 
   int get _player => _game.currentTurnPlayer;
@@ -185,6 +205,11 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
           title: const Text('الدومينو'),
           leading: IconButton(tooltip: 'إنهاء المباراة', onPressed: () => context.pop(), icon: const Icon(Icons.arrow_forward_rounded)),
           actions: [
+            IconButton(
+              tooltip: 'المظاهر',
+              onPressed: _openCosmetics,
+              icon: const Icon(Icons.storefront_rounded),
+            ),
             PopupMenuButton<String>(
               tooltip: 'إعدادات الذكاء الاصطناعي',
               onSelected: (value) {
@@ -239,7 +264,11 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
                   flex: 5,
                   child: Container(
                     width: double.infinity,
-                    decoration: BoxDecoration(color: const Color(0xFF152B2C), borderRadius: BorderRadius.circular(20), border: Border.all(color: aqua.withOpacity(0.18))),
+                    decoration: BoxDecoration(
+                      color: _tableFill(_tableSkin),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: _skinAccent(_tableSkin.replaceFirst('domino_table_', '')).withOpacity(0.65), width: 2),
+                    ),
                     child: _game.board.isEmpty
                         ? const Center(child: Text('ضع القطعة الافتتاحية هنا', style: TextStyle(color: mutedText)))
                         : SingleChildScrollView(
@@ -250,7 +279,7 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   _EndMarker(label: 'طرف ${_game.leftEnd}'),
-                                  ..._game.board.map((tile) => DominoTileFace(tile: tile, compact: true)),
+                                  ..._game.board.map((tile) => DominoTileFace(tile: tile, compact: true, styleId: _tilesSkin.replaceFirst('domino_tiles_', ''))),
                                   _EndMarker(label: 'طرف ${_game.rightEnd}'),
                                 ],
                               ),
@@ -292,6 +321,7 @@ class _DominoGameScreenState extends State<DominoGameScreen> {
                         selected: _selectedTile?.id == tile.id,
                         enabled: _isPlayable(tile),
                         onTap: _isPlayable(tile) ? () => _selectTile(tile) : null,
+                        styleId: _tilesSkin.replaceFirst('domino_tiles_', ''),
                       );
                     },
                   ),
@@ -338,24 +368,29 @@ class _TurnSummary extends StatelessWidget {
 }
 
 class DominoTileFace extends StatelessWidget {
-  const DominoTileFace({super.key, required this.tile, this.enabled = true, this.selected = false, this.compact = false, this.onTap});
+  const DominoTileFace({super.key, required this.tile, this.enabled = true, this.selected = false, this.compact = false, this.onTap, this.styleId = 'classic'});
   final DominoTile tile;
   final bool enabled;
   final bool selected;
   final bool compact;
   final VoidCallback? onTap;
+  final String styleId;
 
   @override
   Widget build(BuildContext context) {
     final width = compact ? 52.0 : 62.0;
     final height = compact ? 72.0 : 88.0;
+    final darkFace = styleId == 'obsidian' || styleId == 'neon';
+    final faceColor = selected ? const Color(0xFF33455B) : _tileFaceColor(styleId);
+    final numberColor = darkFace || selected ? const Color(0xFFF5F0E8) : ink;
+    final strokeColor = selected ? coral : _skinAccent(styleId);
     return Semantics(
       button: onTap != null,
       label: 'قطعة دومينو ${tile.left} إلى ${tile.right}${enabled ? '، قابلة للعب' : ''}',
       child: Opacity(
         opacity: enabled ? 1 : 0.42,
         child: Material(
-          color: selected ? const Color(0xFF33455B) : const Color(0xFFF2EEE3),
+          color: faceColor,
           borderRadius: BorderRadius.circular(12),
           child: InkWell(
             onTap: onTap,
@@ -364,12 +399,12 @@ class DominoTileFace extends StatelessWidget {
               width: width,
               height: height,
               padding: const EdgeInsets.all(5),
-              decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: selected ? coral : const Color(0xFFC9C2B2), width: selected ? 2 : 1)),
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: strokeColor, width: selected ? 2 : 1.5)),
               child: Column(
                 children: [
-                  Expanded(child: Center(child: Text('${tile.left}', style: TextStyle(color: ink, fontSize: compact ? 16 : 20, fontWeight: FontWeight.w900)))),
+                  Expanded(child: Center(child: Text('${tile.left}', style: TextStyle(color: numberColor, fontSize: compact ? 16 : 20, fontWeight: FontWeight.w900)))),
                   Container(height: 1, color: const Color(0xFFBDB5A5)),
-                  Expanded(child: Center(child: Text('${tile.right}', style: TextStyle(color: ink, fontSize: compact ? 16 : 20, fontWeight: FontWeight.w900)))),
+                  Expanded(child: Center(child: Text('${tile.right}', style: TextStyle(color: numberColor, fontSize: compact ? 16 : 20, fontWeight: FontWeight.w900)))),
                 ],
               ),
             ),
@@ -397,6 +432,35 @@ class _PlacementPicker extends StatelessWidget {
         ],
       );
 }
+
+Color _skinAccent(String style) => switch (style) {
+      'gold' || 'crown' || 'regal' => gold,
+      'crystal' => const Color(0xFF9CEBEB),
+      'neon' => const Color(0xFF84F4FF),
+      'flame' => const Color(0xFFFFA16B),
+      'galaxy' => const Color(0xFFB7A6FF),
+      'oak' || 'desert' || 'ivory' => const Color(0xFFD5B487),
+      'forest' => const Color(0xFF8CE6A7),
+      _ => aqua,
+    };
+
+Color _tableFill(String id) => switch (id) {
+      'domino_table_oak' => const Color(0xFF403126),
+      'domino_table_marble' => const Color(0xFF1C2734),
+      'domino_table_royal' => const Color(0xFF382A2B),
+      'domino_table_desert' => const Color(0xFF594636),
+      'domino_table_winter' => const Color(0xFF213949),
+      _ => const Color(0xFF152B2C),
+    };
+
+Color _tileFaceColor(String style) => switch (style) {
+      'oak' => const Color(0xFFD8BC92),
+      'ivory' => const Color(0xFFF6EAD0),
+      'gold' => const Color(0xFFE5C16B),
+      'obsidian' => const Color(0xFF202936),
+      'neon' => const Color(0xFF274750),
+      _ => const Color(0xFFF2EEE3),
+    };
 
 class _EndMarker extends StatelessWidget {
   const _EndMarker({required this.label});

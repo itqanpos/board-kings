@@ -10,6 +10,7 @@ import '../../shared/widgets/game_ui.dart';
 import 'engine/ludo_ai.dart';
 import 'engine/ludo_engine.dart';
 import '../game_ai_difficulty.dart';
+import '../store/data/cosmetic_repository.dart';
 
 const Map<LudoColor, Color> _playerColors = {
   LudoColor.red: Color(0xFFFF775F),
@@ -39,6 +40,32 @@ class _LudoGameScreenState extends State<LudoGameScreen> {
   bool _aiBusy = false;
   GameAiDifficulty _aiDifficulty = GameAiDifficulty.medium;
   Timer? _aiTimer;
+  String _tableSkin = 'ludo_table_classic';
+  String _diceSkin = 'ludo_dice_classic';
+  String _piecesSkin = 'ludo_pieces_classic';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEquippedCosmetics();
+  }
+
+  Future<void> _openCosmetics() async {
+    await context.push('/store');
+    if (mounted) await _loadEquippedCosmetics();
+  }
+
+  Future<void> _loadEquippedCosmetics() async {
+    try {
+      final items = await CosmeticRepository.loadEquipment('ludo');
+      if (!mounted) return;
+      setState(() {
+        _tableSkin = items['table'] ?? _tableSkin;
+        _diceSkin = items['dice'] ?? _diceSkin;
+        _piecesSkin = items['pieces'] ?? _piecesSkin;
+      });
+    } catch (_) {}
+  }
 
   List<LudoPiece> get _legalPieces {
     if (_aiEnabled && _game.currentTurn != LudoColor.red) return const [];
@@ -183,6 +210,11 @@ class _LudoGameScreenState extends State<LudoGameScreen> {
           title: const Text('لودو'),
           leading: IconButton(tooltip: 'إنهاء المباراة', onPressed: () => context.pop(), icon: const Icon(Icons.arrow_forward_rounded)),
           actions: [
+            IconButton(
+              tooltip: 'المظاهر',
+              onPressed: _openCosmetics,
+              icon: const Icon(Icons.storefront_rounded),
+            ),
             PopupMenuButton<String>(
               tooltip: 'إعدادات الذكاء الاصطناعي',
               onSelected: (value) {
@@ -242,7 +274,13 @@ class _LudoGameScreenState extends State<LudoGameScreen> {
                     return Center(
                       child: SizedBox.square(
                         dimension: side,
-                        child: _LudoBoard(game: _game, legalPieceIds: _legalPieces.map((piece) => piece.id).toSet(), onPieceTap: _movePiece),
+                        child: _LudoBoard(
+                          game: _game,
+                          legalPieceIds: _legalPieces.map((piece) => piece.id).toSet(),
+                          onPieceTap: _movePiece,
+                          tableSkin: _tableSkin,
+                          piecesSkin: _piecesSkin,
+                        ),
                       ),
                     );
                   },
@@ -255,14 +293,34 @@ class _LudoGameScreenState extends State<LudoGameScreen> {
                     Expanded(
                       child: Container(
                         padding: const EdgeInsets.all(13),
-                        decoration: BoxDecoration(color: panel, borderRadius: BorderRadius.circular(17)),
+                        decoration: BoxDecoration(
+                          color: panel,
+                          borderRadius: BorderRadius.circular(17),
+                          border: Border.all(color: _skinAccent(_diceSkin.replaceFirst('ludo_dice_', '')).withOpacity(0.55)),
+                        ),
                         child: Row(
                           children: [
                             AnimatedRotation(
                               turns: _game.diceValue == null ? 0 : _game.diceValue! / 6,
                               duration: const Duration(milliseconds: 300),
                               curve: Curves.easeOutBack,
-                              child: const Icon(Icons.casino_rounded, color: aqua, size: 27),
+                              child: Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: _diceFaceColor(_diceSkin.replaceFirst('ludo_dice_', '')),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: _skinAccent(_diceSkin.replaceFirst('ludo_dice_', '')), width: 1.6),
+                                ),
+                                child: Center(
+                                  child: _game.diceValue == null
+                                      ? Icon(Icons.casino_rounded, color: _diceInk(_diceSkin.replaceFirst('ludo_dice_', '')), size: 24)
+                                      : Text(
+                                          '${_game.diceValue}',
+                                          style: TextStyle(color: _diceInk(_diceSkin.replaceFirst('ludo_dice_', '')), fontSize: 20, fontWeight: FontWeight.w900),
+                                        ),
+                                ),
+                              ),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
@@ -349,10 +407,12 @@ class _PlayerPill extends StatelessWidget {
 }
 
 class _LudoBoard extends StatelessWidget {
-  const _LudoBoard({required this.game, required this.legalPieceIds, required this.onPieceTap});
+  const _LudoBoard({required this.game, required this.legalPieceIds, required this.onPieceTap, required this.tableSkin, required this.piecesSkin});
   final LudoGameState game;
   final Set<String> legalPieceIds;
   final ValueChanged<LudoPiece> onPieceTap;
+  final String tableSkin;
+  final String piecesSkin;
 
   @override
   Widget build(BuildContext context) {
@@ -360,7 +420,7 @@ class _LudoBoard extends StatelessWidget {
       decoration: BoxDecoration(
         color: panel,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        border: Border.all(color: _skinAccent(tableSkin.replaceFirst('ludo_table_', '')).withOpacity(0.75), width: 2),
         boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 22, offset: Offset(0, 9))],
       ),
       child: ClipRRect(
@@ -371,7 +431,11 @@ class _LudoBoard extends StatelessWidget {
             final pieces = game.pieces.values.expand((playerPieces) => playerPieces).toList();
             return Stack(
               children: [
-                Positioned.fill(child: CustomPaint(painter: AAAProLudoBoardPainter())),
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: AAAProLudoBoardPainter(style: tableSkin.replaceFirst('ludo_table_', '')),
+                  ),
+                ),
                 for (final piece in pieces)
                   _LudoToken(
                     piece: piece,
@@ -380,6 +444,7 @@ class _LudoBoard extends StatelessWidget {
                     onTap: () => onPieceTap(piece),
                     stackIndex: _stackIndex(piece, pieces),
                     stackSize: _piecesAtSameVisualSquare(piece, pieces).length,
+                    appearanceStyle: piecesSkin.replaceFirst('ludo_pieces_', ''),
                   ),
               ],
             );
@@ -421,6 +486,30 @@ List<LudoPiece> _piecesAtSameVisualSquare(LudoPiece piece, List<LudoPiece> piece
 int _stackIndex(LudoPiece piece, List<LudoPiece> pieces) =>
     _piecesAtSameVisualSquare(piece, pieces).indexWhere((candidate) => candidate.id == piece.id);
 
+Color _diceFaceColor(String style) => switch (style) {
+      'gold' || 'crown' => const Color(0xFFF4C66A),
+      'crystal' => const Color(0xFFB8EAEB),
+      'flame' => const Color(0xFF9C4936),
+      'neon' => const Color(0xFF153D4D),
+      _ => const Color(0xFF354962),
+    };
+
+Color _diceInk(String style) => switch (style) {
+      'gold' || 'crown' || 'crystal' => ink,
+      _ => const Color(0xFFF7F4ED),
+    };
+
+Color _skinAccent(String style) => switch (style) {
+      'gold' || 'crown' || 'regal' => gold,
+      'crystal' => const Color(0xFF9CEBEB),
+      'neon' => const Color(0xFF84F4FF),
+      'flame' => const Color(0xFFFFA16B),
+      'galaxy' => const Color(0xFFB7A6FF),
+      'oak' || 'desert' || 'ivory' => const Color(0xFFD5B487),
+      'forest' => const Color(0xFF8CE6A7),
+      _ => aqua,
+    };
+
 class _LudoToken extends StatelessWidget {
   const _LudoToken({
     required this.piece,
@@ -429,6 +518,7 @@ class _LudoToken extends StatelessWidget {
     required this.onTap,
     required this.stackIndex,
     required this.stackSize,
+    required this.appearanceStyle,
   });
   final LudoPiece piece;
   final double cell;
@@ -436,6 +526,7 @@ class _LudoToken extends StatelessWidget {
   final VoidCallback onTap;
   final int stackIndex;
   final int stackSize;
+  final String appearanceStyle;
 
   @override
   Widget build(BuildContext context) {
@@ -464,7 +555,10 @@ class _LudoToken extends StatelessWidget {
             decoration: BoxDecoration(
               color: _playerColors[piece.color],
               shape: BoxShape.circle,
-              border: Border.all(color: highlighted ? Colors.white : const Color(0xFFE9E7E1), width: highlighted ? 2.5 : 1.1),
+              border: Border.all(
+                color: highlighted ? Colors.white : _skinAccent(appearanceStyle),
+                width: highlighted ? 2.5 : appearanceStyle == 'classic' ? 1.1 : 2,
+              ),
               boxShadow: [BoxShadow(color: _playerColors[piece.color]!.withOpacity(highlighted ? 0.62 : 0.27), blurRadius: highlighted ? 12 : 5, spreadRadius: highlighted ? 1 : 0)],
             ),
             child: Center(child: Text('${piece.index + 1}', style: const TextStyle(color: ink, fontSize: 9, fontWeight: FontWeight.w900))),
